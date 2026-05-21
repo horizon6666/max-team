@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/horizon6666/max-team/internal/audit"
 	"github.com/horizon6666/max-team/internal/bus"
 	"github.com/horizon6666/max-team/internal/config"
@@ -28,7 +27,7 @@ type BaseAgent struct {
 	bus     *bus.MessageBus
 	inbox   <-chan bus.Message
 	audit   *audit.Logger
-	history []anthropic.MessageParam
+	history []llm.Message
 }
 
 func NewBaseAgent(cfg config.AgentConfig, r *llm.Router, tools []tool.Tool, b *bus.MessageBus, a *audit.Logger) BaseAgent {
@@ -59,9 +58,9 @@ func (b *BaseAgent) ResetHistory() {
 }
 
 func (b *BaseAgent) RunLLM(ctx context.Context, userMessage string) (string, error) {
-	b.history = append(b.history, anthropic.MessageParam{
-		Role:    "user",
-		Content: []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(userMessage)},
+	b.history = append(b.history, llm.Message{
+		Role:    llm.RoleUser,
+		Content: userMessage,
 	})
 
 	executor := func(ctx context.Context, name string, input json.RawMessage) (string, error) {
@@ -75,6 +74,7 @@ func (b *BaseAgent) RunLLM(ctx context.Context, userMessage string) (string, err
 
 	req := llm.Request{
 		Model:    b.config.Model,
+		Provider: b.config.Provider,
 		System:   b.config.SystemPrompt,
 		Messages: b.history,
 		Tools:    b.tools,
@@ -86,9 +86,9 @@ func (b *BaseAgent) RunLLM(ctx context.Context, userMessage string) (string, err
 		return "", err
 	}
 
-	b.history = append(b.history, anthropic.MessageParam{
-		Role:    "assistant",
-		Content: []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(result)},
+	b.history = append(b.history, llm.Message{
+		Role:    llm.RoleAssistant,
+		Content: result,
 	})
 
 	return result, nil

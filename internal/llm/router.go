@@ -3,14 +3,10 @@ package llm
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"math"
-	"net/http"
+	"log"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/horizon6666/max-team/internal/audit"
 	"github.com/horizon6666/max-team/internal/config"
 	"github.com/horizon6666/max-team/internal/tool"
@@ -18,8 +14,9 @@ import (
 
 type Request struct {
 	Model    string
+	Provider string
 	System   string
-	Messages []anthropic.MessageParam
+	Messages []Message
 	Tools    []tool.Tool
 	MaxToken int64
 }
@@ -27,190 +24,152 @@ type Request struct {
 type ToolExecutor func(ctx context.Context, name string, input json.RawMessage) (string, error)
 
 type Router struct {
-	client *anthropic.Client
-	config config.LLMConfig
-	audit  *audit.Logger
+	providers       map[string]Provider
+	defaultProvider string
+	defaultModel    string
+	audit           *audit.Logger
 }
 
 func NewRouter(cfg config.LLMConfig, auditLog *audit.Logger) *Router {
-	// SDK auto-reads ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL from env.
-	// Config values override env when explicitly set.
-	var opts []option.RequestOption
-	if cfg.APIKey != "" {
-		opts = append(opts, option.WithAuthToken(cfg.APIKey))
-	}
-	if cfg.BaseURL != "" {
-		opts = append(opts, option.WithBaseURL(cfg.BaseURL))
-	}
-	client := anthropic.NewClient(opts...)
-	return &Router{client: &client, config: cfg, audit: auditLog}
-}
-
-func (r *Router) Chat(ctx context.Context, req Request) (*anthropic.Message, error) {
-	model := req.Model
-	if model == "" {
-		model = r.config.DefaultModel
-	}
-	maxTokens := req.MaxToken
-	if maxTokens == 0 {
-		maxTokens = 4096
+	r := &Router{
+		providers:       make(map[string]Provider),
+		defaultProvider: cfg.DefaultProvider,
+		defaultModel:    cfg.DefaultModel,
+		audit:           auditLog,
 	}
 
-	params := anthropic.MessageNewParams{
-		Model:     model,
-		Messages:  req.Messages,
-		MaxTokens: maxTokens,
-	}
-	if req.System != "" {
-		params.System = []anthropic.TextBlockParam{{Text: req.System}}
-	}
-	if len(req.Tools) > 0 {
-		params.Tools = tool.ToAnthropicTools(req.Tools)
+	for name, pcfg := range cfg.Providers {
+		switch name {
+		case "anthropic":
+			r.providers[name] = NewAnthropicProvider(pcfg)
+		case "openai":
+			r.providers[name] = NewOpenAIProvider(pcfg)
+		default:
+			log.Printf("[router] unknown provider: %s, skipping", name)
+		}
 	}
 
-	return r.chatWithRetry(ctx, params)
+	if len(r.providers) == 0 && cfg.APIKey != "" {
+		pcfg := config.ProviderConfig{
+			APIKey:     cfg.APIKey,
+			BaseURL:    cfg.BaseURL,
+			MaxRetries: cfg.MaxRetries,
+		}
+		providerName := cfg.DefaultProvider
+		if providerName == "" {
+			providerName = "anthropic"
+		}
+		switch providerName {
+		case "openai":
+			r.providers[providerName] = NewOpenAIProvider(pcfg)
+		default:
+			r.providers[providerName] = NewAnthropicProvider(pcfg)
+		}
+		r.defaultProvider = providerName
+	}
+
+	if r.defaultProvider == "" && len(r.providers) > 0 {
+		for name := range r.providers {
+			r.defaultProvider = name
+			break
+		}
+	}
+
+	return r
 }
 
 func (r *Router) RunToolLoop(ctx context.Context, req Request, executor ToolExecutor) (string, error) {
+	provider := r.getProvider(req.Provider)
+	if provider == nil {
+		return "", fmt.Errorf("provider not found: %s (default: %s)", req.Provider, r.defaultProvider)
+	}
+
 	model := req.Model
 	if model == "" {
-		model = r.config.DefaultModel
+		model = r.defaultModel
 	}
-	maxTokens := req.MaxToken
-	if maxTokens == 0 {
-		maxTokens = 4096
+	maxToken := req.MaxToken
+	if maxToken == 0 {
+		maxToken = 4096
 	}
 
-	messages := make([]anthropic.MessageParam, len(req.Messages))
+	toolDefs := toToolDefs(req.Tools)
+	messages := make([]Message, len(req.Messages))
 	copy(messages, req.Messages)
 
-	var anthropicTools []anthropic.ToolUnionParam
-	if len(req.Tools) > 0 {
-		anthropicTools = tool.ToAnthropicTools(req.Tools)
-	}
-
 	for i := 0; i < 20; i++ {
-		params := anthropic.MessageNewParams{
-			Model:     model,
-			Messages:  messages,
-			MaxTokens: maxTokens,
-		}
-		if req.System != "" {
-			params.System = []anthropic.TextBlockParam{{Text: req.System}}
-		}
-		if len(anthropicTools) > 0 {
-			params.Tools = anthropicTools
+		pReq := ProviderRequest{
+			Model:    model,
+			System:   req.System,
+			Messages: messages,
+			Tools:    toolDefs,
+			MaxToken: maxToken,
 		}
 
-		resp, err := r.chatWithRetry(ctx, params)
+		resp, err := provider.Chat(ctx, pReq)
 		if err != nil {
 			return "", fmt.Errorf("llm call failed: %w", err)
 		}
 
-		r.audit.LLMCall("", model, resp.Usage.InputTokens, resp.Usage.OutputTokens)
+		r.audit.LLMCall("", model, resp.InputTokens, resp.OutputTokens)
 
-		messages = append(messages, resp.ToParam())
+		messages = append(messages, Message{
+			Role:      RoleAssistant,
+			Content:   resp.Content,
+			ToolCalls: resp.ToolCalls,
+		})
 
-		if resp.StopReason == "end_turn" || !hasToolUse(resp) {
-			return extractText(resp), nil
+		if resp.StopReason == "end_turn" || len(resp.ToolCalls) == 0 {
+			return resp.Content, nil
 		}
 
-		toolResults := r.executeTools(ctx, resp, executor)
-		messages = append(messages, anthropic.MessageParam{
-			Role:    "user",
-			Content: toolResults,
+		var results []ToolResult
+		for _, tc := range resp.ToolCalls {
+			start := time.Now()
+			output, err := executor(ctx, tc.Name, tc.Input)
+			duration := time.Since(start)
+			r.audit.ToolExec("", tc.Name, duration, err)
+
+			if err != nil {
+				results = append(results, ToolResult{
+					ToolCallID: tc.ID,
+					Content:    fmt.Sprintf("Error: %s", err.Error()),
+					IsError:    true,
+				})
+			} else {
+				results = append(results, ToolResult{
+					ToolCallID: tc.ID,
+					Content:    output,
+				})
+			}
+		}
+
+		messages = append(messages, Message{
+			Role:        RoleUser,
+			ToolResults: results,
 		})
 	}
 
 	return "", fmt.Errorf("tool loop exceeded max iterations (20)")
 }
 
-func (r *Router) executeTools(ctx context.Context, resp *anthropic.Message, executor ToolExecutor) []anthropic.ContentBlockParamUnion {
-	var results []anthropic.ContentBlockParamUnion
-
-	for _, block := range resp.Content {
-		tb, ok := block.AsAny().(anthropic.ToolUseBlock)
-		if !ok {
-			continue
-		}
-
-		start := time.Now()
-		output, err := executor(ctx, tb.Name, tb.Input)
-		duration := time.Since(start)
-
-		r.audit.ToolExec("", tb.Name, duration, err)
-
-		if err != nil {
-			results = append(results, anthropic.NewToolResultBlock(tb.ID, fmt.Sprintf("Error: %s", err.Error()), true))
-		} else {
-			results = append(results, anthropic.NewToolResultBlock(tb.ID, output, false))
+func (r *Router) getProvider(name string) Provider {
+	if name != "" {
+		if p, ok := r.providers[name]; ok {
+			return p
 		}
 	}
-
-	return results
+	return r.providers[r.defaultProvider]
 }
 
-func (r *Router) chatWithRetry(ctx context.Context, params anthropic.MessageNewParams) (*anthropic.Message, error) {
-	maxRetries := r.config.MaxRetries
-	if maxRetries == 0 {
-		maxRetries = 3
-	}
-
-	var lastErr error
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		resp, err := r.client.Messages.New(ctx, params)
-		if err == nil {
-			return resp, nil
-		}
-
-		lastErr = err
-
-		if !isRetryable(err) {
-			return nil, err
-		}
-
-		if attempt < maxRetries {
-			backoff := time.Duration(math.Pow(2, float64(attempt))) * time.Second
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(backoff):
-			}
+func toToolDefs(tools []tool.Tool) []ToolDef {
+	defs := make([]ToolDef, len(tools))
+	for i, t := range tools {
+		defs[i] = ToolDef{
+			Name:        t.Name(),
+			Description: t.Description(),
+			InputSchema: t.InputSchema(),
 		}
 	}
-	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
-}
-
-func hasToolUse(msg *anthropic.Message) bool {
-	for _, block := range msg.Content {
-		if _, ok := block.AsAny().(anthropic.ToolUseBlock); ok {
-			return true
-		}
-	}
-	return false
-}
-
-func extractText(msg *anthropic.Message) string {
-	var text string
-	for _, block := range msg.Content {
-		if tb, ok := block.AsAny().(anthropic.TextBlock); ok {
-			if text != "" {
-				text += "\n"
-			}
-			text += tb.Text
-		}
-	}
-	return text
-}
-
-func isRetryable(err error) bool {
-	var apiErr *anthropic.Error
-	if ok := errors.As(err, &apiErr); ok {
-		code := apiErr.StatusCode
-		return code == http.StatusTooManyRequests ||
-			code == http.StatusInternalServerError ||
-			code == http.StatusBadGateway ||
-			code == http.StatusServiceUnavailable
-	}
-	return false
+	return defs
 }

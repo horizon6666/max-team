@@ -3,10 +3,17 @@ server:
   mode: cli
 
 llm:
-  provider: anthropic
-  api_key: ${ANTHROPIC_AUTH_TOKEN}
-  base_url: ${ANTHROPIC_BASE_URL}
+  default_provider: anthropic
   default_model: auto-max
+
+  providers:
+    anthropic:
+      api_key: ${ANTHROPIC_AUTH_TOKEN}
+      base_url: ${ANTHROPIC_BASE_URL}
+    # openai:
+    #   api_key: ${OPENAI_API_KEY}
+    #   base_url: https://api.openai.com
+
   max_retries: 3
   timeout: 120s
 

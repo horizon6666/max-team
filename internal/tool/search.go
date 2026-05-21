@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/anthropics/anthropic-sdk-go"
 )
 
 type SearchCode struct {
@@ -15,19 +14,17 @@ type SearchCode struct {
 
 func (t *SearchCode) Name() string        { return "search_code" }
 func (t *SearchCode) Description() string { return "在代码库中搜索指定模式的文本" }
-func (t *SearchCode) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{
-			"pattern": map[string]any{
-				"type":        "string",
-				"description": "搜索模式（grep 正则表达式）",
-			},
-			"file_pattern": map[string]any{
-				"type":        "string",
-				"description": "文件名过滤（如 *.go），可选",
-			},
+func (t *SearchCode) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{
+		"pattern": map[string]any{
+			"type":        "string",
+			"description": "搜索模式（grep 正则表达式）",
 		},
-	}
+		"file_pattern": map[string]any{
+			"type":        "string",
+			"description": "文件名过滤（如 *.go），可选",
+		},
+	})
 }
 
 func (t *SearchCode) Execute(ctx context.Context, input json.RawMessage) (string, error) {

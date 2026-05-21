@@ -22,12 +22,22 @@ type ServerConfig struct {
 }
 
 type LLMConfig struct {
-	Provider     string        `yaml:"provider"`
-	APIKey       string        `yaml:"api_key"`
-	BaseURL      string        `yaml:"base_url"`
-	DefaultModel string        `yaml:"default_model"`
-	MaxRetries   int           `yaml:"max_retries"`
-	Timeout      time.Duration `yaml:"timeout"`
+	DefaultProvider string                    `yaml:"default_provider"`
+	DefaultModel    string                    `yaml:"default_model"`
+	Providers       map[string]ProviderConfig `yaml:"providers"`
+
+	// Legacy fields — backward compatible
+	Provider   string        `yaml:"provider"`
+	APIKey     string        `yaml:"api_key"`
+	BaseURL    string        `yaml:"base_url"`
+	MaxRetries int           `yaml:"max_retries"`
+	Timeout    time.Duration `yaml:"timeout"`
+}
+
+type ProviderConfig struct {
+	APIKey     string `yaml:"api_key"`
+	BaseURL    string `yaml:"base_url"`
+	MaxRetries int    `yaml:"max_retries"`
 }
 
 type AuditConfig struct {
@@ -49,6 +59,7 @@ type AgentConfig struct {
 	Name         string            `yaml:"name"`
 	Role         string            `yaml:"role"`
 	Model        string            `yaml:"model"`
+	Provider     string            `yaml:"provider"`
 	SystemPrompt string            `yaml:"system_prompt"`
 	Tools        []string          `yaml:"tools"`
 	MCPServers   []MCPServerConfig `yaml:"mcp_servers"`
@@ -78,6 +89,14 @@ func Load(configPath, agentsPath string) (*Config, *AgentsConfig, error) {
 	}
 	expandEnv(&cfg.LLM.APIKey)
 	expandEnv(&cfg.LLM.BaseURL)
+	if cfg.LLM.Providers != nil {
+		for name, pcfg := range cfg.LLM.Providers {
+			expandEnv(&pcfg.APIKey)
+			expandEnv(&pcfg.BaseURL)
+			cfg.LLM.Providers[name] = pcfg
+		}
+	}
+	migrateLegacyLLMConfig(&cfg.LLM)
 	setConfigDefaults(cfg)
 
 	agents := &AgentsConfig{}
@@ -89,6 +108,34 @@ func Load(configPath, agentsPath string) (*Config, *AgentsConfig, error) {
 	}
 
 	return cfg, agents, nil
+}
+
+func migrateLegacyLLMConfig(llm *LLMConfig) {
+	if llm.Providers != nil && len(llm.Providers) > 0 {
+		return
+	}
+	if llm.APIKey == "" {
+		return
+	}
+
+	providerName := llm.Provider
+	if providerName == "" {
+		providerName = llm.DefaultProvider
+	}
+	if providerName == "" {
+		providerName = "anthropic"
+	}
+
+	llm.Providers = map[string]ProviderConfig{
+		providerName: {
+			APIKey:     llm.APIKey,
+			BaseURL:    llm.BaseURL,
+			MaxRetries: llm.MaxRetries,
+		},
+	}
+	if llm.DefaultProvider == "" {
+		llm.DefaultProvider = providerName
+	}
 }
 
 func loadYAML(path string, out any) error {

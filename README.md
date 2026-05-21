@@ -55,8 +55,11 @@ export ANTHROPIC_BASE_URL="https://api.anthropic.com"  # 或公司 LLM Proxy 地
 # 指定模型
 ./max-team --model claude-opus-4
 
-# 指定 API 地址和 Key
-./max-team --base-url http://llm-proxy.example.com --api-key sk-xxx
+# 使用 OpenAI 兼容模型（GPT、GLM、DeepSeek、MiniMax 等）
+./max-team --provider openai --model gpt-4o --base-url https://api.openai.com --api-key sk-xxx
+
+# 使用 DeepSeek
+./max-team --provider openai --model deepseek-chat --base-url https://api.deepseek.com --api-key sk-xxx
 
 # 组合使用
 ./max-team --model auto-max --base-url http://llm-proxy.example.com --api-key sk-xxx
@@ -68,10 +71,21 @@ export ANTHROPIC_BASE_URL="https://api.anthropic.com"  # 或公司 LLM Proxy 地
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `--model` | 覆盖所有 Agent 的模型名称 | 配置文件中的值 |
+| `--provider` | 覆盖 Provider (`anthropic`/`openai`) | 配置文件中的值 |
 | `--base-url` | 覆盖 LLM API 地址 | 配置文件中的值 |
 | `--api-key` | 覆盖 API Key | 配置文件中的值 |
 | `--config` | 全局配置文件路径 | `config/config.yaml` |
 | `--agents` | Agent 配置文件路径 | `config/agents.yaml` |
+
+### 支持的模型
+
+| Provider | 模型 | 说明 |
+|----------|------|------|
+| `anthropic` | Claude (auto-max, claude-opus-4 等) | 默认，Anthropic 协议 |
+| `openai` | GPT-4o, GPT-4, GPT-3.5 等 | OpenAI 官方 |
+| `openai` | DeepSeek (deepseek-chat 等) | OpenAI 兼容协议 |
+| `openai` | GLM (glm-4 等) | 智谱，OpenAI 兼容 |
+| `openai` | MiniMax, Moonshot, 通义千问 等 | OpenAI 兼容 |
 
 ### 使用示例
 

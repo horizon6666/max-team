@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/anthropics/anthropic-sdk-go"
 )
 
 // ========== git_diff ==========
@@ -17,15 +16,13 @@ type GitDiff struct {
 
 func (t *GitDiff) Name() string        { return "git_diff" }
 func (t *GitDiff) Description() string { return "查看 Git 工作区的代码变更" }
-func (t *GitDiff) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{
-			"staged": map[string]any{
-				"type":        "boolean",
-				"description": "是否只查看已暂存的变更，默认 false",
-			},
+func (t *GitDiff) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{
+		"staged": map[string]any{
+			"type":        "boolean",
+			"description": "是否只查看已暂存的变更，默认 false",
 		},
-	}
+	})
 }
 
 func (t *GitDiff) Execute(ctx context.Context, input json.RawMessage) (string, error) {
@@ -59,20 +56,18 @@ type GitCommit struct {
 
 func (t *GitCommit) Name() string        { return "git_commit" }
 func (t *GitCommit) Description() string { return "暂存并提交代码变更" }
-func (t *GitCommit) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{
-			"message": map[string]any{
-				"type":        "string",
-				"description": "提交信息",
-			},
-			"files": map[string]any{
-				"type":        "array",
-				"description": "要暂存的文件列表，为空则暂存所有变更",
-				"items":       map[string]any{"type": "string"},
-			},
+func (t *GitCommit) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{
+		"message": map[string]any{
+			"type":        "string",
+			"description": "提交信息",
 		},
-	}
+		"files": map[string]any{
+			"type":        "array",
+			"description": "要暂存的文件列表，为空则暂存所有变更",
+			"items":       map[string]any{"type": "string"},
+		},
+	})
 }
 
 func (t *GitCommit) Execute(ctx context.Context, input json.RawMessage) (string, error) {
@@ -119,10 +114,8 @@ type GitStatus struct {
 
 func (t *GitStatus) Name() string        { return "git_status" }
 func (t *GitStatus) Description() string { return "查看 Git 仓库状态" }
-func (t *GitStatus) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{},
-	}
+func (t *GitStatus) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{})
 }
 
 func (t *GitStatus) Execute(ctx context.Context, _ json.RawMessage) (string, error) {

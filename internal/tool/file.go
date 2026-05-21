@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/anthropics/anthropic-sdk-go"
 )
 
 // ========== read_file ==========
@@ -20,15 +19,13 @@ type ReadFile struct {
 
 func (t *ReadFile) Name() string        { return "read_file" }
 func (t *ReadFile) Description() string { return "读取指定路径的文件内容" }
-func (t *ReadFile) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "文件路径（相对于项目根目录）",
-			},
+func (t *ReadFile) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{
+		"path": map[string]any{
+			"type":        "string",
+			"description": "文件路径（相对于项目根目录）",
 		},
-	}
+	})
 }
 
 func (t *ReadFile) Execute(_ context.Context, input json.RawMessage) (string, error) {
@@ -70,19 +67,17 @@ type WriteFile struct {
 
 func (t *WriteFile) Name() string        { return "write_file" }
 func (t *WriteFile) Description() string { return "写入内容到指定路径的文件" }
-func (t *WriteFile) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "文件路径（相对于项目根目录）",
-			},
-			"content": map[string]any{
-				"type":        "string",
-				"description": "要写入的文件内容",
-			},
+func (t *WriteFile) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{
+		"path": map[string]any{
+			"type":        "string",
+			"description": "文件路径（相对于项目根目录）",
 		},
-	}
+		"content": map[string]any{
+			"type":        "string",
+			"description": "要写入的文件内容",
+		},
+	})
 }
 
 func (t *WriteFile) Execute(_ context.Context, input json.RawMessage) (string, error) {
@@ -139,15 +134,13 @@ type ListDir struct {
 
 func (t *ListDir) Name() string        { return "list_dir" }
 func (t *ListDir) Description() string { return "列出指定目录的内容" }
-func (t *ListDir) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{
-			"path": map[string]any{
-				"type":        "string",
-				"description": "目录路径（相对于项目根目录）",
-			},
+func (t *ListDir) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{
+		"path": map[string]any{
+			"type":        "string",
+			"description": "目录路径（相对于项目根目录）",
 		},
-	}
+	})
 }
 
 func (t *ListDir) Execute(_ context.Context, input json.RawMessage) (string, error) {

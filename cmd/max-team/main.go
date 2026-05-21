@@ -18,6 +18,7 @@ func main() {
 	configPath := flag.String("config", "config/config.yaml", "配置文件路径")
 	agentsPath := flag.String("agents", "config/agents.yaml", "Agent 配置文件路径")
 	model := flag.String("model", "", "覆盖所有 Agent 的模型名称")
+	provider := flag.String("provider", "", "覆盖 Provider (anthropic/openai)")
 	baseURL := flag.String("base-url", "", "覆盖 LLM API 地址")
 	apiKey := flag.String("api-key", "", "覆盖 API Key")
 	flag.Parse()
@@ -46,11 +47,27 @@ func main() {
 			agentsCfg.Agents[i].Model = *model
 		}
 	}
+	if *provider != "" {
+		cfg.LLM.DefaultProvider = *provider
+		for i := range agentsCfg.Agents {
+			agentsCfg.Agents[i].Provider = *provider
+		}
+	}
 	if *baseURL != "" {
 		cfg.LLM.BaseURL = *baseURL
+		for _, pcfg := range cfg.LLM.Providers {
+			pcfg.BaseURL = *baseURL
+			cfg.LLM.Providers[cfg.LLM.DefaultProvider] = pcfg
+			break
+		}
 	}
 	if *apiKey != "" {
 		cfg.LLM.APIKey = *apiKey
+		for _, pcfg := range cfg.LLM.Providers {
+			pcfg.APIKey = *apiKey
+			cfg.LLM.Providers[cfg.LLM.DefaultProvider] = pcfg
+			break
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

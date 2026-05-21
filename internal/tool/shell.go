@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anthropics/anthropic-sdk-go"
 )
 
 type RunShell struct {
@@ -17,15 +16,13 @@ type RunShell struct {
 
 func (t *RunShell) Name() string        { return "run_shell" }
 func (t *RunShell) Description() string { return "执行 shell 命令（仅限白名单命令）" }
-func (t *RunShell) InputSchema() anthropic.ToolInputSchemaParam {
-	return anthropic.ToolInputSchemaParam{
-		Properties: map[string]any{
-			"command": map[string]any{
-				"type":        "string",
-				"description": "要执行的 shell 命令",
-			},
+func (t *RunShell) InputSchema() json.RawMessage {
+	return MakeSchema(map[string]any{
+		"command": map[string]any{
+			"type":        "string",
+			"description": "要执行的 shell 命令",
 		},
-	}
+	})
 }
 
 func (t *RunShell) Execute(ctx context.Context, input json.RawMessage) (string, error) {

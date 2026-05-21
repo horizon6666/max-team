@@ -3,26 +3,20 @@ package tool
 import (
 	"context"
 	"encoding/json"
-
-	"github.com/anthropics/anthropic-sdk-go"
 )
 
 type Tool interface {
 	Name() string
 	Description() string
-	InputSchema() anthropic.ToolInputSchemaParam
+	InputSchema() json.RawMessage
 	Execute(ctx context.Context, input json.RawMessage) (string, error)
 }
 
-func ToAnthropicTools(tools []Tool) []anthropic.ToolUnionParam {
-	params := make([]anthropic.ToolUnionParam, len(tools))
-	for i, t := range tools {
-		tp := anthropic.ToolParam{
-			Name:        t.Name(),
-			Description: anthropic.String(t.Description()),
-			InputSchema: t.InputSchema(),
-		}
-		params[i] = anthropic.ToolUnionParam{OfTool: &tp}
+func MakeSchema(properties map[string]any) json.RawMessage {
+	schema := map[string]any{
+		"type":       "object",
+		"properties": properties,
 	}
-	return params
+	b, _ := json.Marshal(schema)
+	return b
 }
