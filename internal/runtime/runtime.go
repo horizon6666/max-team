@@ -1,14 +1,15 @@
 package runtime
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/chzyer/readline"
 	"github.com/horizon6666/max-team/internal/agent"
 	"github.com/horizon6666/max-team/internal/audit"
 	"github.com/horizon6666/max-team/internal/bus"
@@ -51,6 +52,7 @@ type Runtime struct {
 	agents    []agent.Agent
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
+	rl        *readline.Instance
 
 	state       cliState
 	pendingMsg  bus.Message
@@ -131,17 +133,33 @@ func (rt *Runtime) Run() {
 	inputCh := make(chan string)
 	stdinClosed := false
 
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          "> ",
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
+	if err != nil {
+		log.Fatalf("readline init failed: %v", err)
+	}
+	defer rl.Close()
+	rt.rl = rl
+
 	go func() {
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			inputCh <- scanner.Text()
+		for {
+			line, err := rl.Readline()
+			if err != nil {
+				if err == readline.ErrInterrupt || err == io.EOF {
+					close(inputCh)
+					return
+				}
+				continue
+			}
+			inputCh <- line
 		}
-		close(inputCh)
 	}()
 
 	rt.printWelcome()
 	rt.state = stateIdle
-	rt.prompt()
 
 	for {
 		select {
@@ -165,13 +183,16 @@ func (rt *Runtime) Run() {
 	}
 }
 
+func (rt *Runtime) printf(format string, a ...any) {
+	fmt.Fprintf(rt.rl.Stdout(), format, a...)
+}
+
 func (rt *Runtime) handleInput(input string) {
 	if input == "" {
-		rt.prompt()
 		return
 	}
 	if input == "quit" || input == "exit" {
-		fmt.Printf("\n%s再见！%s\n", colorCyan, colorReset)
+		rt.printf("\n%s再见！%s\n", colorCyan, colorReset)
 		rt.Stop()
 		os.Exit(0)
 	}
@@ -179,7 +200,7 @@ func (rt *Runtime) handleInput(input string) {
 	switch rt.state {
 	case stateIdle:
 		rt.state = stateWaitingReply
-		fmt.Printf("%s⏳ Max 正在分析你的需求...%s\n", colorYellow, colorReset)
+		rt.printf("%s⏳ Max 正在分析你的需求...%s\n", colorYellow, colorReset)
 		rt.bus.Send(bus.Message{
 			From:    "user",
 			To:      "max",
@@ -198,10 +219,10 @@ func (rt *Runtime) handleInput(input string) {
 			ReplyTo: rt.pendingMsg.ID,
 		})
 		if approved {
-			fmt.Printf("%s✅ 已批准，任务开始执行...%s\n", colorGreen, colorReset)
+			rt.printf("%s✅ 已批准，任务开始执行...%s\n", colorGreen, colorReset)
 			rt.state = stateWaitingReply
 		} else {
-			fmt.Printf("%s❌ 已拒绝%s\n", colorRed, colorReset)
+			rt.printf("%s❌ 已拒绝%s\n", colorRed, colorReset)
 			rt.state = stateWaitingReply
 		}
 
@@ -215,53 +236,47 @@ func (rt *Runtime) handleInput(input string) {
 		rt.state = stateWaitingReply
 
 	case stateWaitingReply:
-		fmt.Printf("%s⏳ 请等待当前任务完成...%s\n", colorYellow, colorReset)
+		rt.printf("%s⏳ 请等待当前任务完成...%s\n", colorYellow, colorReset)
 	}
 }
 
 func (rt *Runtime) handleMessage(msg bus.Message) {
 	switch msg.Type {
 	case bus.MsgUserReply:
-		fmt.Printf("\n%s%s[Max]%s %s\n\n", colorBold, colorBlue, colorReset, msg.Payload)
+		rt.printf("\n%s%s[Max]%s %s\n\n", colorBold, colorBlue, colorReset, msg.Payload)
 		rt.state = stateIdle
-		rt.prompt()
 
 	case bus.MsgApprovalReq:
 		rt.pendingMsg = msg
 		rt.state = stateWaitingApproval
 		tasks, ok := msg.Payload.([]*task.Task)
 		if ok {
-			fmt.Print(gate.FormatApproval(tasks))
+			fmt.Fprint(rt.rl.Stdout(), gate.FormatApproval(tasks))
 		}
 
 	case bus.MsgProgress:
-		fmt.Printf("%s💬 %s%s\n", colorYellow, msg.Payload, colorReset)
+		rt.printf("%s💬 %s%s\n", colorYellow, msg.Payload, colorReset)
 
 	case bus.MsgNeedClarify:
 		rt.clarifyFrom = msg.From
 		rt.state = stateWaitingClarify
-		fmt.Printf("\n%s❓ %s%s\n", colorCyan, msg.Payload, colorReset)
-		rt.prompt()
+		rt.printf("\n%s❓ %s%s\n", colorCyan, msg.Payload, colorReset)
 
 	case bus.MsgTaskFailed:
 		if result, ok := msg.Payload.(*task.Result); ok {
-			fmt.Printf("%s⚠️  任务失败: %s%s\n", colorRed, result.Error, colorReset)
+			rt.printf("%s⚠️  任务失败: %s%s\n", colorRed, result.Error, colorReset)
 		}
 	}
 }
 
-func (rt *Runtime) prompt() {
-	fmt.Print("> ")
-}
-
 func (rt *Runtime) printWelcome() {
-	fmt.Println()
-	fmt.Printf("%s%s╔══════════════════════════════════════╗%s\n", colorBold, colorCyan, colorReset)
-	fmt.Printf("%s%s║          Max Team CLI v0.1           ║%s\n", colorBold, colorCyan, colorReset)
-	fmt.Printf("%s%s╚══════════════════════════════════════╝%s\n", colorBold, colorCyan, colorReset)
-	fmt.Println()
-	fmt.Printf("  输入需求，Max 会拆解并协调团队完成。\n")
-	fmt.Printf("  输入 %squit%s 退出。\n\n", colorYellow, colorReset)
+	rt.printf("\n")
+	rt.printf("%s%s╔══════════════════════════════════════╗%s\n", colorBold, colorCyan, colorReset)
+	rt.printf("%s%s║          Max Team CLI v0.1           ║%s\n", colorBold, colorCyan, colorReset)
+	rt.printf("%s%s╚══════════════════════════════════════╝%s\n", colorBold, colorCyan, colorReset)
+	rt.printf("\n")
+	rt.printf("  输入需求，Max 会拆解并协调团队完成。\n")
+	rt.printf("  输入 %squit%s 退出。\n\n", colorYellow, colorReset)
 }
 
 func (rt *Runtime) Stop() {
