@@ -444,6 +444,11 @@
         <td><code>Registry.Register(tool)</code> <code>.ForRole(role)</code></td>
       </tr>
       <tr>
+        <td><strong>Skill Engine</strong></td>
+        <td>Skill 加载、Agent 可用性校验、prompt 注入、I/O 契约验证</td>
+        <td><code>SkillEngine.Execute()</code> <code>SkillRegistry.ForAgent()</code></td>
+      </tr>
+      <tr>
         <td><strong>MCP Manager</strong></td>
         <td>MCP Server 进程管理、协议通信、工具动态发现</td>
         <td><code>MCPManager.Connect(server)</code> <code>.CallTool()</code></td>
@@ -675,7 +680,44 @@ type ToolResult struct {
     </tbody>
   </table>
 
-  <h3>7.3 MCP 集成</h3>
+  <h3>7.3 Skill 层</h3>
+  <p>Skill 是 Tool 之上的可复用工作流模板，由 <strong>Prompt 模板 + 工具子集 + I/O 契约</strong> 组成。Agent 激活 skill 后，按专用 prompt 和受限工具集执行，产出结构化结果。</p>
+  <pre>
+type Skill struct {
+    Name          string           // "code_review" / "bug_triage"
+    Description   string
+    Prompt        string           // 针对该 skill 的专用 prompt 模板
+    RequiredTools []string         // 需要的工具列表
+    InputSchema   json.RawMessage  // 输入参数 JSON Schema
+    OutputSchema  json.RawMessage  // 输出结构 JSON Schema
+    Timeout       time.Duration
+}
+
+type SkillRegistry struct {
+    skills map[string]*Skill
+}
+
+func (r *SkillRegistry) Load(path string) error          // 从 YAML 加载
+func (r *SkillRegistry) ForAgent(agent *Agent) []*Skill   // 返回 agent 可用的 skill
+func (r *SkillRegistry) Get(name string) *Skill           // 按名称查找</pre>
+
+  <table>
+    <thead>
+      <tr><th>内置 Skill</th><th>说明</th><th>所需工具</th><th>可用 Agent</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>code_review</code></td><td>代码审查，输出问题列表和修复建议</td><td>read_file, git_diff, search_code</td><td>Ada / Leo</td></tr>
+      <tr><td><code>bug_triage</code></td><td>Bug 分诊，定位根因并给出修复方案</td><td>read_file, search_code, query_log</td><td>Ada（+ Sam 配合）</td></tr>
+      <tr><td><code>test_coverage_analysis</code></td><td>测试覆盖率分析，识别未覆盖路径</td><td>run_test, coverage_report, read_file</td><td>Ray</td></tr>
+      <tr><td><code>impact_analysis</code></td><td>变更影响分析，评估改动波及范围</td><td>read_file, search_code</td><td>Ada</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Skill vs Tool</strong>：Tool 是原子操作（读文件、执行命令），Skill 是由 LLM 驱动的多步工作流。Skill 不硬编码步骤，而是通过专用 prompt 引导 LLM 自主编排 tool 调用——兼顾确定性（I/O 契约）和灵活性（LLM 推理）。
+  </div>
+
+  <h3>7.5 MCP 集成</h3>
   <p>每个 Agent 可独立连接自己的 MCP Server，通过标准 MCP 协议（JSON-RPC over stdio）通信：</p>
   <pre>
 type MCPServer struct {
@@ -702,7 +744,7 @@ func (a *Agent) initMCP() {
     }
 }</pre>
 
-  <h3>7.4 Tool 权限矩阵</h3>
+  <h3>7.6 Tool 权限矩阵</h3>
   <div class="arch-diagram" style="padding: 20px;">
     <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif">
       <!-- Headers -->
@@ -881,7 +923,23 @@ type AgentConstraints struct {
     Timeout         time.Duration   // 任务超时时间
 }</pre>
 
-  <h3>9.4 LLM Router</h3>
+  <h3>9.4 Skill Engine</h3>
+  <pre>
+type SkillEngine struct {
+    registry *SkillRegistry
+}
+
+// 激活 skill：注入 prompt、限制工具集、执行、校验输出
+func (e *SkillEngine) Execute(ctx context.Context, agent *Agent, skillName string, input json.RawMessage) (*SkillResult, error)
+
+type SkillResult struct {
+    SkillName string
+    Output    json.RawMessage   // 符合 OutputSchema 的结构化结果
+    ToolCalls []ToolCallRecord  // 执行过程中的工具调用记录
+    Usage     TokenUsage
+}</pre>
+
+  <h3>9.5 LLM Router</h3>
   <pre>
 type LLMRouter interface {
     Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error)
@@ -900,7 +958,7 @@ type ChatResponse struct {
     Usage     TokenUsage
 }</pre>
 
-  <h3>9.5 Scheduler</h3>
+  <h3>9.6 Scheduler</h3>
   <pre>
 type Scheduler struct {
     tasks    map[string]*Task
@@ -1027,6 +1085,7 @@ func (s *Scheduler) GetStatus() *DAGStatus          // 获取整体进度</pre>
   <ul style="padding-left:20px; margin:12px 0;">
     <li>增加 Ada / Ray / Sam Agent</li>
     <li>MCP 集成</li>
+    <li><strong>Skill 引擎 + 内置 Skill</strong>（code_review / bug_triage / test_coverage_analysis）</li>
     <li>任务 DAG 可视化</li>
     <li>审计日志</li>
   </ul>
@@ -1037,6 +1096,7 @@ func (s *Scheduler) GetStatus() *DAGStatus          // 获取整体进度</pre>
     <li>多项目/多工作区支持</li>
     <li>Agent 记忆与学习（跨会话持久化）</li>
     <li>自定义 Agent 类型（通过配置文件）</li>
+    <li>自定义 Skill（用户通过 YAML 定义私有 skill）</li>
     <li>成本监控（token 用量统计）</li>
   </ul>
 </div>

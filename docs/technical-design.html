@@ -221,9 +221,15 @@
       <p>Agent 可以使用的能力。分为内置工具（读写文件、执行命令）和 MCP 工具（gitnexus、cooper 等外部服务）。<strong>工具白名单 = 权限边界</strong>。</p>
     </div>
   </div>
-  <div class="col-card" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px;">
-    <h4 style="color:var(--accent2)">Approval Gate（审批门控）</h4>
-    <p>暂停执行、等待用户确认的检查点。出现在两个时机：执行前的方案确认、执行中的危险操作确认。确保人始终掌握最终决策权。</p>
+  <div class="two-col" style="margin-top:16px;">
+    <div class="col-card">
+      <h4 style="color:var(--red)">Skill（技能）</h4>
+      <p>由 Prompt 模板 + 工具子集 + I/O 契约组成的可复用工作流。比如"代码审查"skill 封装了 diff → 读文件 → 分析 → 输出报告的完整流程。Agent 激活 skill 后，按 skill 的专用 prompt 和工具集执行，产出结构化结果。</p>
+    </div>
+    <div class="col-card">
+      <h4 style="color:var(--accent2)">Approval Gate（审批门控）</h4>
+      <p>暂停执行、等待用户确认的检查点。出现在两个时机：执行前的方案确认、执行中的危险操作确认。确保人始终掌握最终决策权。</p>
+    </div>
   </div>
 </div>
 
@@ -232,7 +238,7 @@
   <h2><span class="sn">03</span>系统全景</h2>
 
   <div class="diagram">
-    <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif">
+    <svg viewBox="0 0 800 640" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif">
       <!-- User -->
       <rect x="320" y="10" width="160" height="44" rx="22" fill="#232733" stroke="#6c8aff" stroke-width="2"/>
       <text x="400" y="38" text-anchor="middle" fill="#e0e0e6" font-size="14" font-weight="600">You</text>
@@ -305,13 +311,21 @@
       <text x="690" y="458" text-anchor="middle" fill="#a78bfa" font-size="10">Claude Haiku</text>
       <line x1="650" y1="330" x2="500" y2="286" stroke="#8b8fa3" stroke-width="1"/>
 
+      <!-- Skill layer -->
+      <rect x="30" y="490" width="740" height="40" rx="8" fill="#232733" stroke="#f87171" stroke-width="1.2"/>
+      <text x="400" y="515" text-anchor="middle" fill="#f87171" font-size="12" font-weight="600">Skill 层（可复用工作流：Prompt 模板 + 工具子集 + I/O 契约）</text>
+      <text x="150" y="526" text-anchor="middle" fill="#8b8fa3" font-size="9">code_review</text>
+      <text x="310" y="526" text-anchor="middle" fill="#8b8fa3" font-size="9">bug_triage</text>
+      <text x="490" y="526" text-anchor="middle" fill="#8b8fa3" font-size="9">test_analysis</text>
+      <text x="650" y="526" text-anchor="middle" fill="#8b8fa3" font-size="9">自定义 skill...</text>
+
       <!-- Infrastructure layer -->
-      <rect x="30" y="510" width="740" height="70" rx="10" fill="#232733" stroke="#2e3348" stroke-width="1"/>
-      <text x="400" y="536" text-anchor="middle" fill="#8b8fa3" font-size="12" font-weight="600">基础设施层（非 Agent 工具，Go 代码直接调用）</text>
-      <text x="140" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">审计日志</text>
-      <text x="300" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">LLM Router</text>
-      <text x="460" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">MCP 连接管理</text>
-      <text x="640" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">配置加载</text>
+      <rect x="30" y="550" width="740" height="70" rx="10" fill="#232733" stroke="#2e3348" stroke-width="1"/>
+      <text x="400" y="576" text-anchor="middle" fill="#8b8fa3" font-size="12" font-weight="600">基础设施层（非 Agent 工具，Go 代码直接调用）</text>
+      <text x="140" y="602" text-anchor="middle" fill="#8b8fa3" font-size="11">审计日志</text>
+      <text x="300" y="602" text-anchor="middle" fill="#8b8fa3" font-size="11">LLM Router</text>
+      <text x="460" y="602" text-anchor="middle" fill="#8b8fa3" font-size="11">MCP 连接管理</text>
+      <text x="640" y="602" text-anchor="middle" fill="#8b8fa3" font-size="11">配置加载</text>
     </svg>
   </div>
 
@@ -374,7 +388,46 @@
     <strong>效果</strong>：成本和质量的平衡。不是所有场景都需要最强模型。
   </div>
 
-  <h3>决策 5：Tool 与基础设施的分层</h3>
+  <h3>决策 5：为什么引入 Skill 层？</h3>
+  <div class="callout decision">
+    <strong>决策</strong>：在 Tool 之上增加 Skill 层——可复用的工作流模板，由 Prompt 模板 + 工具子集 + I/O 契约组成。<br><br>
+    <strong>考虑过的替代方案</strong>：
+    <ul style="margin-top:8px;">
+      <li><strong>纯 Tool 编排</strong>：完全靠 Agent 的 system prompt 驱动 LLM 自行组合 tool 调用。简单但不稳定——同一类任务每次执行路径可能不同，质量波动大。</li>
+      <li><strong>硬编码工作流</strong>：在 Go 代码中写死步骤（step1 → step2 → step3）。确定性高但完全不灵活，加新流程就得改代码。</li>
+    </ul>
+    <strong>Skill 的设计</strong>：
+    <ul style="margin-top:8px;">
+      <li><strong>Prompt 模板</strong>：针对特定任务的专用 prompt（如代码审查的关注点、输出格式），比通用 system prompt 产出质量更高</li>
+      <li><strong>工具子集</strong>：Skill 声明它需要哪些 tool，Agent 必须拥有这些 tool 才能激活该 skill</li>
+      <li><strong>I/O 契约</strong>：明确输入参数和输出结构，让上下游 skill/task 可以可靠对接</li>
+      <li><strong>YAML 定义</strong>：新增 skill 只需写配置，不改 Go 代码</li>
+    </ul>
+    <strong>例子</strong>：
+    <pre style="margin-top:8px;">
+skills:
+  - name: code_review
+    description: "审查代码变更，输出结构化审查报告"
+    prompt: |
+      你是一个严格的代码审查者。检查以下变更：
+      - 逻辑正确性
+      - 边界条件
+      - 安全隐患（注入、未校验输入）
+      - 代码风格一致性
+      输出 JSON 格式的审查报告。
+    required_tools: [read_file, git_diff, search_code]
+    input:
+      - name: diff
+        type: string
+        description: "待审查的代码变更"
+    output:
+      type: review_report
+      fields: [issues, summary, verdict]</pre>
+    <strong>代价</strong>：多一层抽象，增加理解成本。<br>
+    <strong>缓解</strong>：Skill 是可选的——简单任务可以直接用 tool，只有重复出现的工作流才值得封装为 skill。
+  </div>
+
+  <h3>决策 6：Tool 与基础设施的分层</h3>
   <div class="callout decision">
     <strong>决策</strong>：系统中的 I/O 分为两层——Tool 层（LLM 可控）和 基础设施层（Go 代码直接调用）。<br><br>
     <strong>为什么</strong>：
@@ -618,6 +671,30 @@
       timeout: 120s</pre>
   <p><strong>不需要改任何 Go 代码</strong>。框架自动根据配置创建 Agent 实例、注册工具、接入消息总线。</p>
 
+  <h3>加一个新 Skill 需要什么？</h3>
+  <p>在 <code>skills.yaml</code> 中添加一段配置：</p>
+  <pre>
+  - name: bug_triage
+    description: "Bug 分诊：定位根因并输出修复建议"
+    prompt: |
+      分析以下 Bug 报告，结合代码和日志：
+      1. 复现路径
+      2. 根因定位
+      3. 修复建议（含代码片段）
+      输出结构化 JSON。
+    required_tools: [read_file, search_code, query_log]
+    input:
+      - name: bug_description
+        type: string
+      - name: error_log
+        type: string
+        optional: true
+    output:
+      type: triage_report
+      fields: [root_cause, fix_suggestion, severity]
+    timeout: 180s</pre>
+  <p><strong>框架自动完成</strong>：验证 Agent 是否具备所需 tool → 注入 skill prompt → 执行 → 校验输出结构。Agent 不满足 <code>required_tools</code> 时，该 skill 不可用。</p>
+
   <h3>加一个新工具需要什么？</h3>
   <ol>
     <li>实现 <code>Tool</code> 接口（Name / Description / Parameters / Execute）</li>
@@ -689,10 +766,12 @@
     </div>
     <div class="col-card" style="border-color:var(--accent);">
       <h4 style="color:var(--accent)">Phase 2 — 完善（3 周）</h4>
-      <p>补齐团队成员和外部集成</p>
+      <p>补齐团队成员、外部集成和 Skill 层</p>
       <ul>
         <li>Ada（架构师）+ Ray（测试）+ Sam（运维）</li>
         <li>MCP 集成（gitnexus / cooper / grafana）</li>
+        <li><strong>Skill 引擎</strong>：YAML 加载、prompt 注入、I/O 校验</li>
+        <li><strong>内置 Skill</strong>：code_review / bug_triage / test_coverage_analysis</li>
         <li>审计日志</li>
         <li>DAG 可视化（终端输出）</li>
         <li>任务重试与错误恢复</li>
@@ -726,6 +805,7 @@
   <p>Max Team — 技术方案 v0.1 — 2026-05-21</p>
   <p style="margin-top:8px;">
     <a href="overview-design.html">概要设计</a> ·
+    <a href="technical-design.html">技术设计</a> ·
     <a href="detailed-design.html">详细设计（代码蓝图）</a>
   </p>
 </div>
