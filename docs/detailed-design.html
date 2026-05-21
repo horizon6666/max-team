@@ -1199,6 +1199,22 @@ func (r *Router) RunToolLoop(ctx context.Context, req ChatRequest,
   <!-- 3.6 Tool Registry -->
   <div id="s3-6">
   <h3>3.6 Tool Registry</h3>
+
+  <div class="callout info">
+    <strong>Tool vs 基础设施：关键区分</strong><br><br>
+    系统中存在两种 I/O 操作，不可混淆：
+    <table style="margin:12px 0;">
+      <thead><tr><th></th><th>Tool（工具）</th><th>基础设施</th></tr></thead>
+      <tbody>
+        <tr><td><strong>调用者</strong></td><td>LLM 通过 tool_call 决策</td><td>Go 代码直接调用</td></tr>
+        <tr><td><strong>权限控制</strong></td><td>按 AgentConfig.Tools 白名单过滤</td><td>所有 Agent 共享</td></tr>
+        <tr><td><strong>示例</strong></td><td>read_file, write_file, run_shell</td><td>Audit Logger, MessageBus, MCP Client</td></tr>
+        <tr><td><strong>可审计</strong></td><td>每次调用都记录审计日志</td><td>自身就是审计基础设施</td></tr>
+      </tbody>
+    </table>
+    例如：Max 没有 <code>write_file</code> 工具，LLM 无法写任意文件。但 Max 的 Go 代码仍可通过 Audit Logger 写日志——这是基础设施层面的 I/O，不受 Tool 权限约束。
+  </div>
+
   <p>工具注册中心，按 Agent 配置过滤可用工具。</p>
 
   <pre>
