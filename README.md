@@ -47,6 +47,32 @@ export ANTHROPIC_BASE_URL="https://api.anthropic.com"  # 或公司 LLM Proxy 地
 ./max-team
 ```
 
+### CLI 参数
+
+命令行参数优先级高于配置文件：
+
+```bash
+# 指定模型
+./max-team --model claude-opus-4
+
+# 指定 API 地址和 Key
+./max-team --base-url http://llm-proxy.example.com --api-key sk-xxx
+
+# 组合使用
+./max-team --model auto-max --base-url http://llm-proxy.example.com --api-key sk-xxx
+
+# 指定配置文件
+./max-team --config path/to/config.yaml --agents path/to/agents.yaml
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--model` | 覆盖所有 Agent 的模型名称 | 配置文件中的值 |
+| `--base-url` | 覆盖 LLM API 地址 | 配置文件中的值 |
+| `--api-key` | 覆盖 API Key | 配置文件中的值 |
+| `--config` | 全局配置文件路径 | `config/config.yaml` |
+| `--agents` | Agent 配置文件路径 | `config/agents.yaml` |
+
 ### 使用示例
 
 ```

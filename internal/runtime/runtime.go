@@ -251,7 +251,7 @@ func (rt *Runtime) handleMessage(msg bus.Message) {
 }
 
 func (rt *Runtime) prompt() {
-	fmt.Printf("%s> %s", colorGreen, colorReset)
+	fmt.Print("> ")
 }
 
 func (rt *Runtime) printWelcome() {
