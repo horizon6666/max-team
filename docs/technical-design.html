@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Max Team — 技术方案</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2e3348;
+    --text: #e0e0e6;
+    --text-muted: #8b8fa3;
+    --accent: #6c8aff;
+    --accent2: #a78bfa;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --red: #f87171;
+    --cyan: #22d3ee;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    padding: 40px 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  .header {
+    text-align: center;
+    padding: 50px 0 36px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .header h1 {
+    font-size: 2em;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+  .header .subtitle { color: var(--text-muted); font-size: 1em; }
+  .header .meta {
+    margin-top: 16px;
+    display: flex; justify-content: center; gap: 24px;
+    font-size: 0.82em; color: var(--text-muted);
+  }
+
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 48px;
+  }
+  .toc h2 { font-size: 1em; color: var(--accent); margin-bottom: 12px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin-bottom: 5px; font-size: 0.93em; }
+  .toc a { color: var(--text); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+
+  .section { margin-bottom: 52px; scroll-margin-top: 30px; }
+  .section h2 {
+    font-size: 1.4em; font-weight: 600; color: var(--accent);
+    margin-bottom: 6px; padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section h3 {
+    font-size: 1.1em; font-weight: 600; color: var(--accent2);
+    margin: 26px 0 10px;
+  }
+  .section p { margin: 12px 0; }
+  .section ul, .section ol { padding-left: 22px; margin: 10px 0; }
+  .section li { margin-bottom: 6px; }
+
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 20px;
+    margin: 20px 0;
+    text-align: center;
+    overflow-x: auto;
+  }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+    font-size: 0.92em;
+  }
+  .callout.decision { border-left-color: var(--orange); }
+  .callout.risk { border-left-color: var(--red); }
+  .callout.ok { border-left-color: var(--green); }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9em;
+  }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: var(--surface); color: var(--accent); font-weight: 600; }
+
+  pre {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    line-height: 1.6;
+    margin: 14px 0;
+  }
+  code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    background: var(--surface2);
+    padding: 2px 6px; border-radius: 4px; font-size: 0.88em;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+  .col-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .col-card h4 {
+    font-size: 0.95em; font-weight: 600; margin-bottom: 8px;
+  }
+  .col-card p, .col-card ul { font-size: 0.9em; color: var(--text-muted); }
+
+  .sn { color: var(--text-muted); font-size: 0.85em; margin-right: 8px; }
+
+  .footer {
+    text-align: center; padding: 40px 0 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted); font-size: 0.85em;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <h1>Max Team — 技术方案</h1>
+  <div class="subtitle">多 Agent 协作系统技术设计方案（评审版）</div>
+  <div class="meta">
+    <span>v0.1</span>
+    <span>Go + Claude API</span>
+    <span>2026-05-21</span>
+  </div>
+</div>
+
+<!-- TOC -->
+<nav class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#s1">背景与目标</a></li>
+    <li><a href="#s2">核心概念</a></li>
+    <li><a href="#s3">系统全景</a></li>
+    <li><a href="#s4">关键设计决策</a></li>
+    <li><a href="#s5">数据流与状态流转</a></li>
+    <li><a href="#s6">模块交互流程</a></li>
+    <li><a href="#s7">安全模型</a></li>
+    <li><a href="#s8">可扩展性设计</a></li>
+    <li><a href="#s9">风险与 Trade-off</a></li>
+    <li><a href="#s10">分阶段落地计划</a></li>
+  </ol>
+</nav>
+
+<!-- 1. 背景与目标 -->
+<div class="section" id="s1">
+  <h2><span class="sn">01</span>背景与目标</h2>
+
+  <h3>要解决什么问题</h3>
+  <p>日常开发中，一个完整任务往往涉及多个环节：理解需求、设计方案、写代码、跑测试、查日志。这些环节需要不同的专业能力和工具权限。单一 AI 助手要么权限过大（安全风险），要么能力面太广（每个方向都不够深）。</p>
+
+  <h3>目标</h3>
+  <ul>
+    <li><strong>分工明确</strong>：每个 Agent 专注一个领域，拥有该领域的专业 prompt 和专用工具</li>
+    <li><strong>权限可控</strong>：写代码的不能查日志，查日志的不能写代码——最小权限原则</li>
+    <li><strong>人在环中</strong>：关键决策（整体方案、危险操作）必须用户确认，日常执行自动推进</li>
+    <li><strong>可扩展</strong>：加新 Agent 只需写一份配置，不改框架代码</li>
+  </ul>
+</div>
+
+<!-- 2. 核心概念 -->
+<div class="section" id="s2">
+  <h2><span class="sn">02</span>核心概念</h2>
+
+  <p>理解整个系统只需要抓住 5 个概念：</p>
+
+  <div class="two-col">
+    <div class="col-card">
+      <h4 style="color:var(--accent)">Agent（角色）</h4>
+      <p>一个拥有特定身份、工具集和 LLM 后端的自治单元。每个 Agent 有自己的 system prompt 定义人设，有自己的工具白名单定义能力边界。</p>
+    </div>
+    <div class="col-card">
+      <h4 style="color:var(--green)">Task（任务）</h4>
+      <p>一件需要完成的具体工作。有明确的负责人（哪个 Agent）、输入（描述 + 上游产出物）、输出（结果 + 产出物）。多个 Task 通过依赖关系组成 DAG。</p>
+    </div>
+    <div class="col-card">
+      <h4 style="color:var(--orange)">Artifact（产出物）</h4>
+      <p>Task 完成后的交付物。比如 Ada 产出 design_doc，Leo 产出 code_diff，Ray 产出 test_report。上游的 Artifact 自动注入下游 Task 的上下文。</p>
+    </div>
+    <div class="col-card">
+      <h4 style="color:var(--cyan)">Tool（工具）</h4>
+      <p>Agent 可以使用的能力。分为内置工具（读写文件、执行命令）和 MCP 工具（gitnexus、cooper 等外部服务）。<strong>工具白名单 = 权限边界</strong>。</p>
+    </div>
+  </div>
+  <div class="col-card" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px;">
+    <h4 style="color:var(--accent2)">Approval Gate（审批门控）</h4>
+    <p>暂停执行、等待用户确认的检查点。出现在两个时机：执行前的方案确认、执行中的危险操作确认。确保人始终掌握最终决策权。</p>
+  </div>
+</div>
+
+<!-- 3. 系统全景 -->
+<div class="section" id="s3">
+  <h2><span class="sn">03</span>系统全景</h2>
+
+  <div class="diagram">
+    <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif">
+      <!-- User -->
+      <rect x="320" y="10" width="160" height="44" rx="22" fill="#232733" stroke="#6c8aff" stroke-width="2"/>
+      <text x="400" y="38" text-anchor="middle" fill="#e0e0e6" font-size="14" font-weight="600">You</text>
+
+      <line x1="400" y1="54" x2="400" y2="90" stroke="#8b8fa3" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <text x="430" y="78" fill="#8b8fa3" font-size="10">自然语言对话</text>
+
+      <!-- Max box -->
+      <rect x="240" y="90" width="320" height="130" rx="12" fill="#1a1d27" stroke="#6c8aff" stroke-width="2"/>
+      <text x="400" y="116" text-anchor="middle" fill="#6c8aff" font-size="15" font-weight="700">Max — 私人助理</text>
+      <text x="400" y="140" text-anchor="middle" fill="#8b8fa3" font-size="12">"你只需要跟我说，我来安排团队"</text>
+
+      <text x="280" y="172" fill="#e0e0e6" font-size="11">理解需求</text>
+      <text x="355" y="172" fill="#e0e0e6" font-size="11">拆解任务</text>
+      <text x="430" y="172" fill="#e0e0e6" font-size="11">方案确认</text>
+      <text x="505" y="172" fill="#e0e0e6" font-size="11">进度汇报</text>
+
+      <text x="400" y="205" text-anchor="middle" fill="#a78bfa" font-size="10">Claude Sonnet · 无文件操作权限</text>
+
+      <!-- Approval Gate -->
+      <rect x="610" y="120" width="110" height="32" rx="16" fill="#232733" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="665" y="141" text-anchor="middle" fill="#fb923c" font-size="11" font-weight="600">审批门控</text>
+      <line x1="560" y1="140" x2="610" y2="140" stroke="#fb923c" stroke-width="1.2"/>
+
+      <!-- Scheduler + Bus layer -->
+      <rect x="200" y="250" width="400" height="36" rx="8" fill="#232733" stroke="#22d3ee" stroke-width="1.2"/>
+      <text x="400" y="273" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="600">任务调度器 + 消息总线</text>
+      <text x="400" y="290" text-anchor="middle" fill="#8b8fa3" font-size="10">DAG 拓扑排序 · 并行派发 · 自动注入上游产出物</text>
+
+      <line x1="400" y1="220" x2="400" y2="250" stroke="#8b8fa3" stroke-width="1.2"/>
+
+      <!-- Workers -->
+      <!-- Leo -->
+      <rect x="30" y="330" width="160" height="140" rx="10" fill="#1a1d27" stroke="#4ade80" stroke-width="1.5"/>
+      <text x="110" y="356" text-anchor="middle" fill="#4ade80" font-size="14" font-weight="600">Leo — 码农</text>
+      <line x1="50" y1="365" x2="170" y2="365" stroke="#2e3348" stroke-width="1"/>
+      <text x="110" y="385" text-anchor="middle" fill="#e0e0e6" font-size="11">写代码 · 改 Bug · 重构</text>
+      <text x="110" y="408" text-anchor="middle" fill="#8b8fa3" font-size="10">读写文件 · Shell(受限) · Git</text>
+      <text x="110" y="428" text-anchor="middle" fill="#8b8fa3" font-size="10">MCP: gitnexus</text>
+      <text x="110" y="458" text-anchor="middle" fill="#a78bfa" font-size="10">Claude Opus</text>
+      <line x1="110" y1="330" x2="300" y2="286" stroke="#8b8fa3" stroke-width="1"/>
+
+      <!-- Ada -->
+      <rect x="220" y="330" width="160" height="140" rx="10" fill="#1a1d27" stroke="#6c8aff" stroke-width="1.5"/>
+      <text x="300" y="356" text-anchor="middle" fill="#6c8aff" font-size="14" font-weight="600">Ada — 架构师</text>
+      <line x1="240" y1="365" x2="360" y2="365" stroke="#2e3348" stroke-width="1"/>
+      <text x="300" y="385" text-anchor="middle" fill="#e0e0e6" font-size="11">方案设计 · 架构评审</text>
+      <text x="300" y="408" text-anchor="middle" fill="#8b8fa3" font-size="10">只读文件 · 代码搜索</text>
+      <text x="300" y="428" text-anchor="middle" fill="#8b8fa3" font-size="10">MCP: gitnexus + cooper</text>
+      <text x="300" y="458" text-anchor="middle" fill="#a78bfa" font-size="10">Claude Opus</text>
+      <line x1="300" y1="330" x2="370" y2="286" stroke="#8b8fa3" stroke-width="1"/>
+
+      <!-- Ray -->
+      <rect x="415" y="330" width="160" height="140" rx="10" fill="#1a1d27" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="495" y="356" text-anchor="middle" fill="#a78bfa" font-size="14" font-weight="600">Ray — 测试</text>
+      <line x1="435" y1="365" x2="555" y2="365" stroke="#2e3348" stroke-width="1"/>
+      <text x="495" y="385" text-anchor="middle" fill="#e0e0e6" font-size="11">写测试 · 跑测试 · 覆盖率</text>
+      <text x="495" y="408" text-anchor="middle" fill="#8b8fa3" font-size="10">写文件(仅 *_test.go)</text>
+      <text x="495" y="428" text-anchor="middle" fill="#8b8fa3" font-size="10">go test · 覆盖率报告</text>
+      <text x="495" y="458" text-anchor="middle" fill="#a78bfa" font-size="10">Claude Sonnet</text>
+      <line x1="465" y1="330" x2="430" y2="286" stroke="#8b8fa3" stroke-width="1"/>
+
+      <!-- Sam -->
+      <rect x="610" y="330" width="160" height="140" rx="10" fill="#1a1d27" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="690" y="356" text-anchor="middle" fill="#fb923c" font-size="14" font-weight="600">Sam — 运维</text>
+      <line x1="630" y1="365" x2="750" y2="365" stroke="#2e3348" stroke-width="1"/>
+      <text x="690" y="385" text-anchor="middle" fill="#e0e0e6" font-size="11">日志查询 · 监控排查</text>
+      <text x="690" y="408" text-anchor="middle" fill="#8b8fa3" font-size="10">查日志 · 查指标</text>
+      <text x="690" y="428" text-anchor="middle" fill="#8b8fa3" font-size="10">MCP: grafana</text>
+      <text x="690" y="458" text-anchor="middle" fill="#a78bfa" font-size="10">Claude Haiku</text>
+      <line x1="650" y1="330" x2="500" y2="286" stroke="#8b8fa3" stroke-width="1"/>
+
+      <!-- Infrastructure layer -->
+      <rect x="30" y="510" width="740" height="70" rx="10" fill="#232733" stroke="#2e3348" stroke-width="1"/>
+      <text x="400" y="536" text-anchor="middle" fill="#8b8fa3" font-size="12" font-weight="600">基础设施层（非 Agent 工具，Go 代码直接调用）</text>
+      <text x="140" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">审计日志</text>
+      <text x="300" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">LLM Router</text>
+      <text x="460" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">MCP 连接管理</text>
+      <text x="640" y="562" text-anchor="middle" fill="#8b8fa3" font-size="11">配置加载</text>
+    </svg>
+  </div>
+
+  <p>整个系统可以用一句话概括：<strong>用户只和 Max 对话，Max 把活拆给专人干，干完了汇总给你</strong>。</p>
+</div>
+
+<!-- 4. 关键设计决策 -->
+<div class="section" id="s4">
+  <h2><span class="sn">04</span>关键设计决策</h2>
+
+  <h3>决策 1：为什么星型拓扑，不让 Worker 直接通信？</h3>
+  <div class="callout decision">
+    <strong>决策</strong>：所有 Worker 只和 Max 通信，不互相对话。<br><br>
+    <strong>考虑过的替代方案</strong>：Mesh 网络（Worker 之间自由通信）<br><br>
+    <strong>选择星型的原因</strong>：
+    <ul style="margin-top:8px;">
+      <li><strong>信息可控</strong>：Max 作为中心节点，可以裁剪上下文——Ray 不需要知道 Ada 推导方案的完整过程，只需要拿到最终的接口定义</li>
+      <li><strong>易审计</strong>：所有信息都经过 Max，一个地方就能看到完整的协作过程</li>
+      <li><strong>避免混乱</strong>：N 个 Agent 互相对话会产生 N*(N-1) 条通信链路，信息容易发散</li>
+    </ul>
+    <strong>代价</strong>：Max 是瓶颈。如果 Max 挂了或响应慢，整个团队停摆。<br>
+    <strong>缓解</strong>：Max 用轻量模型（Sonnet），只做调度不做重活。
+  </div>
+
+  <h3>决策 2：为什么用 DAG 而不是简单队列？</h3>
+  <div class="callout decision">
+    <strong>决策</strong>：任务按 DAG（有向无环图）组织，不是线性队列。<br><br>
+    <strong>原因</strong>：真实工作场景中，任务之间有复杂的依赖关系和并行机会：
+    <ul style="margin-top:8px;">
+      <li>Bug 排查：Ops 查日志 和 Ada 看代码 可以<strong>并行</strong></li>
+      <li>新功能：必须 Ada 先设计 → Leo 再实现 → Ray 最后测试（<strong>串行</strong>）</li>
+      <li>重构：Leo 改模块A、B、C 可以<strong>并行</strong>，最后 Ray 做集成测试</li>
+    </ul>
+    队列做不到这种灵活性。DAG 让调度器自动识别哪些任务可以并行，哪些必须等待。
+  </div>
+
+  <h3>决策 3：为什么工具即权限，而不是单独的权限系统？</h3>
+  <div class="callout decision">
+    <strong>决策</strong>：Agent 的能力边界完全由其工具白名单决定，没有额外的权限层。<br><br>
+    <strong>原因</strong>：
+    <ul style="margin-top:8px;">
+      <li><strong>简单有效</strong>：LLM 只能调用注册给它的工具，没有 <code>write_file</code> 就不可能写文件，从架构上杜绝越权</li>
+      <li><strong>无绕过风险</strong>：不像传统 RBAC 可能被绕过，工具不存在就是不存在</li>
+      <li><strong>易配置</strong>：在 YAML 里增减工具名即可调整权限</li>
+    </ul>
+    <strong>补充约束</strong>：部分工具自带细粒度控制（如 shell 命令白名单、文件写入路径限制）。
+  </div>
+
+  <h3>决策 4：为什么不同 Agent 用不同模型？</h3>
+  <div class="callout decision">
+    <strong>决策</strong>：按任务复杂度匹配模型——Opus 给重活，Haiku 给轻活。<br><br>
+    <table>
+      <tr><th>Agent</th><th>模型</th><th>理由</th></tr>
+      <tr><td>Max</td><td>Sonnet</td><td>调度逻辑不复杂，但需要稳定可靠</td></tr>
+      <tr><td>Leo</td><td>Opus</td><td>写代码是最复杂的任务，需要最强推理</td></tr>
+      <tr><td>Ada</td><td>Opus</td><td>架构设计需要深度分析和全局视野</td></tr>
+      <tr><td>Ray</td><td>Sonnet</td><td>写测试相对模式化，Sonnet 够用</td></tr>
+      <tr><td>Sam</td><td>Haiku</td><td>日志查询是结构化操作，不需要强推理</td></tr>
+    </table>
+    <strong>效果</strong>：成本和质量的平衡。不是所有场景都需要最强模型。
+  </div>
+
+  <h3>决策 5：Tool 与基础设施的分层</h3>
+  <div class="callout decision">
+    <strong>决策</strong>：系统中的 I/O 分为两层——Tool 层（LLM 可控）和 基础设施层（Go 代码直接调用）。<br><br>
+    <strong>为什么</strong>：
+    <ul style="margin-top:8px;">
+      <li>Tool 是暴露给 LLM 的能力，受白名单控制——这是<strong>权限边界</strong></li>
+      <li>基础设施（审计日志、消息总线、MCP 连接）是程序自身的运行支撑——不受 Tool 权限约束</li>
+    </ul>
+    <strong>例子</strong>：Max 没有 <code>write_file</code> 工具（LLM 无法写任意文件），但 Max 的 Go 代码可以通过 Audit Logger 写日志。<br>
+    这不是漏洞，而是设计：权限控制的是 LLM 的决策能力，不是宿主程序的运行能力。
+  </div>
+</div>
+
+<!-- 5. 数据流与状态流转 -->
+<div class="section" id="s5">
+  <h2><span class="sn">05</span>数据流与状态流转</h2>
+
+  <h3>5.1 任务状态机</h3>
+  <div class="diagram">
+    <svg viewBox="0 0 750 180" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif">
+      <!-- States -->
+      <rect x="10" y="60" width="80" height="36" rx="18" fill="#232733" stroke="#8b8fa3" stroke-width="1.5"/>
+      <text x="50" y="83" text-anchor="middle" fill="#8b8fa3" font-size="11">Created</text>
+
+      <rect x="120" y="60" width="80" height="36" rx="18" fill="#232733" stroke="#6c8aff" stroke-width="1.5"/>
+      <text x="160" y="83" text-anchor="middle" fill="#6c8aff" font-size="11">Planned</text>
+
+      <rect x="230" y="60" width="90" height="36" rx="18" fill="#232733" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="275" y="83" text-anchor="middle" fill="#fb923c" font-size="11">Approved</text>
+
+      <rect x="350" y="60" width="100" height="36" rx="18" fill="#232733" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="400" y="83" text-anchor="middle" fill="#22d3ee" font-size="11">Dispatched</text>
+
+      <rect x="480" y="60" width="80" height="36" rx="18" fill="#232733" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="520" y="83" text-anchor="middle" fill="#a78bfa" font-size="11">Running</text>
+
+      <rect x="600" y="30" width="70" height="36" rx="18" fill="#232733" stroke="#4ade80" stroke-width="1.5"/>
+      <text x="635" y="53" text-anchor="middle" fill="#4ade80" font-size="11">Done</text>
+
+      <rect x="600" y="90" width="70" height="36" rx="18" fill="#232733" stroke="#f87171" stroke-width="1.5"/>
+      <text x="635" y="113" text-anchor="middle" fill="#f87171" font-size="11">Failed</text>
+
+      <!-- Arrows -->
+      <line x1="90" y1="78" x2="120" y2="78" stroke="#8b8fa3" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="200" y1="78" x2="230" y2="78" stroke="#8b8fa3" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="320" y1="78" x2="350" y2="78" stroke="#8b8fa3" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="450" y1="78" x2="480" y2="78" stroke="#8b8fa3" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="560" y1="70" x2="600" y2="52" stroke="#4ade80" stroke-width="1.2" marker-end="url(#arr)"/>
+      <line x1="560" y1="86" x2="600" y2="105" stroke="#f87171" stroke-width="1.2" marker-end="url(#arr)"/>
+
+      <!-- Retry arrow -->
+      <path d="M635,126 Q635,160 400,160 Q365,160 365,96" fill="none" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+      <text x="500" y="155" text-anchor="middle" fill="#fb923c" font-size="10">重试（max 2 次）</text>
+
+      <!-- Labels -->
+      <text x="50" y="42" text-anchor="middle" fill="#8b8fa3" font-size="9">Max 拆解</text>
+      <text x="160" y="42" text-anchor="middle" fill="#8b8fa3" font-size="9">纳入 DAG</text>
+      <text x="275" y="42" text-anchor="middle" fill="#8b8fa3" font-size="9">用户确认</text>
+      <text x="400" y="42" text-anchor="middle" fill="#8b8fa3" font-size="9">派发给 Agent</text>
+      <text x="520" y="42" text-anchor="middle" fill="#8b8fa3" font-size="9">Agent 执行中</text>
+
+      <defs>
+        <marker id="arr" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+          <path d="M0,0 L7,2.5 L0,5" fill="none" stroke="currentColor" stroke-width="1"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <h3>5.2 Artifact 流转</h3>
+  <p>上游任务的产出物自动注入下游任务的上下文，形成信息链：</p>
+  <div class="diagram" style="padding:20px;">
+    <svg viewBox="0 0 700 120" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif">
+      <rect x="10" y="20" width="140" height="80" rx="8" fill="#1a1d27" stroke="#6c8aff" stroke-width="1.2"/>
+      <text x="80" y="45" text-anchor="middle" fill="#6c8aff" font-size="12" font-weight="600">Ada: 设计</text>
+      <text x="80" y="70" text-anchor="middle" fill="#8b8fa3" font-size="10">产出: design_doc</text>
+      <text x="80" y="86" text-anchor="middle" fill="#8b8fa3" font-size="10">(接口定义 + 数据模型)</text>
+
+      <line x1="150" y1="60" x2="200" y2="60" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="175" y="50" text-anchor="middle" fill="#4ade80" font-size="9">注入</text>
+
+      <rect x="200" y="20" width="140" height="80" rx="8" fill="#1a1d27" stroke="#4ade80" stroke-width="1.2"/>
+      <text x="270" y="45" text-anchor="middle" fill="#4ade80" font-size="12" font-weight="600">Leo: 写代码</text>
+      <text x="270" y="70" text-anchor="middle" fill="#8b8fa3" font-size="10">输入: design_doc</text>
+      <text x="270" y="86" text-anchor="middle" fill="#8b8fa3" font-size="10">产出: code_diff</text>
+
+      <line x1="340" y1="60" x2="390" y2="60" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="365" y="50" text-anchor="middle" fill="#4ade80" font-size="9">注入</text>
+
+      <rect x="390" y="20" width="140" height="80" rx="8" fill="#1a1d27" stroke="#a78bfa" stroke-width="1.2"/>
+      <text x="460" y="45" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="600">Ray: 测试</text>
+      <text x="460" y="70" text-anchor="middle" fill="#8b8fa3" font-size="10">输入: code_diff</text>
+      <text x="460" y="86" text-anchor="middle" fill="#8b8fa3" font-size="10">产出: test_report</text>
+
+      <line x1="530" y1="60" x2="580" y2="60" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="555" y="50" text-anchor="middle" fill="#4ade80" font-size="9">汇总</text>
+
+      <rect x="580" y="20" width="110" height="80" rx="8" fill="#1a1d27" stroke="#6c8aff" stroke-width="1.2"/>
+      <text x="635" y="50" text-anchor="middle" fill="#6c8aff" font-size="12" font-weight="600">Max: 汇总</text>
+      <text x="635" y="75" text-anchor="middle" fill="#8b8fa3" font-size="10">输出给用户</text>
+    </svg>
+  </div>
+</div>
+
+<!-- 6. 模块交互流程 -->
+<div class="section" id="s6">
+  <h2><span class="sn">06</span>模块交互流程</h2>
+
+  <h3>场景：用户提出一个新功能需求</h3>
+  <div class="diagram">
+    <svg viewBox="0 0 750 560" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif">
+      <!-- Swim lanes -->
+      <text x="75" y="20" text-anchor="middle" fill="#e0e0e6" font-size="12" font-weight="600">You</text>
+      <text x="225" y="20" text-anchor="middle" fill="#6c8aff" font-size="12" font-weight="600">Max</text>
+      <text x="375" y="20" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="600">调度器</text>
+      <text x="525" y="20" text-anchor="middle" fill="#6c8aff" font-size="12" font-weight="600">Ada</text>
+      <text x="650" y="20" text-anchor="middle" fill="#4ade80" font-size="12" font-weight="600">Leo</text>
+
+      <line x1="75" y1="30" x2="75" y2="540" stroke="#2e3348" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="225" y1="30" x2="225" y2="540" stroke="#2e3348" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="375" y1="30" x2="375" y2="540" stroke="#2e3348" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="525" y1="30" x2="525" y2="540" stroke="#2e3348" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="650" y1="30" x2="650" y2="540" stroke="#2e3348" stroke-width="1" stroke-dasharray="4,4"/>
+
+      <!-- Step 1 -->
+      <rect x="10" y="50" width="130" height="24" rx="4" fill="#232733" stroke="#2e3348"/>
+      <text x="75" y="66" text-anchor="middle" fill="#8b8fa3" font-size="10">1. "加个批量导入"</text>
+      <line x1="140" y1="62" x2="220" y2="62" stroke="#6c8aff" stroke-width="1.2" marker-end="url(#arr)"/>
+
+      <!-- Step 2 -->
+      <rect x="175" y="85" width="100" height="45" rx="6" fill="#1a1d27" stroke="#6c8aff" stroke-width="1"/>
+      <text x="225" y="103" text-anchor="middle" fill="#6c8aff" font-size="10">2. LLM 分析需求</text>
+      <text x="225" y="118" text-anchor="middle" fill="#8b8fa3" font-size="9">拆解为 3 个 Task</text>
+
+      <!-- Step 3 -->
+      <line x1="230" y1="130" x2="370" y2="150" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="300" y="142" text-anchor="middle" fill="#8b8fa3" font-size="9">3. 提交 DAG</text>
+
+      <!-- Step 4 -->
+      <line x1="370" y1="170" x2="140" y2="190" stroke="#fb923c" stroke-width="1.2" marker-end="url(#arr)"/>
+      <rect x="115" y="182" width="180" height="22" rx="4" fill="#232733" stroke="#fb923c"/>
+      <text x="205" y="197" text-anchor="middle" fill="#fb923c" font-size="10">4. "以下是执行方案，确认？"</text>
+
+      <!-- Step 5 -->
+      <line x1="140" y1="220" x2="370" y2="240" stroke="#4ade80" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="255" y="228" text-anchor="middle" fill="#4ade80" font-size="10">5. "OK 执行吧"</text>
+
+      <!-- Step 6 -->
+      <line x1="380" y1="260" x2="520" y2="275" stroke="#6c8aff" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="450" y="265" text-anchor="middle" fill="#8b8fa3" font-size="9">6. 派发 T1 给 Ada</text>
+
+      <!-- Step 7 -->
+      <rect x="480" y="285" width="90" height="45" rx="6" fill="#1a1d27" stroke="#6c8aff" stroke-width="1"/>
+      <text x="525" y="303" text-anchor="middle" fill="#6c8aff" font-size="10">7. Ada 设计方案</text>
+      <text x="525" y="318" text-anchor="middle" fill="#8b8fa3" font-size="9">读代码 + 分析</text>
+
+      <!-- Step 8 -->
+      <line x1="520" y1="330" x2="380" y2="350" stroke="#4ade80" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="450" y="340" text-anchor="middle" fill="#4ade80" font-size="9">8. 完成，返回 design_doc</text>
+
+      <!-- Step 9 -->
+      <line x1="380" y1="370" x2="645" y2="385" stroke="#4ade80" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="510" y="375" text-anchor="middle" fill="#8b8fa3" font-size="9">9. 派发 T2 给 Leo（附带 design_doc）</text>
+
+      <!-- Step 10 -->
+      <rect x="605" y="395" width="90" height="45" rx="6" fill="#1a1d27" stroke="#4ade80" stroke-width="1"/>
+      <text x="650" y="413" text-anchor="middle" fill="#4ade80" font-size="10">10. Leo 写代码</text>
+      <text x="650" y="428" text-anchor="middle" fill="#8b8fa3" font-size="9">读写文件 + 测试</text>
+
+      <!-- Step 11 -->
+      <line x1="645" y1="440" x2="380" y2="460" stroke="#4ade80" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="510" y="450" text-anchor="middle" fill="#4ade80" font-size="9">11. 完成，返回 code_diff</text>
+
+      <!-- Step 12 -->
+      <line x1="370" y1="475" x2="230" y2="490" stroke="#22d3ee" stroke-width="1.2" marker-end="url(#arr)"/>
+      <text x="300" y="482" text-anchor="middle" fill="#22d3ee" font-size="9">12. 所有任务完成</text>
+
+      <!-- Step 13 -->
+      <line x1="220" y1="510" x2="140" y2="525" stroke="#6c8aff" stroke-width="1.2" marker-end="url(#arr)"/>
+      <rect x="20" y="517" width="180" height="22" rx="4" fill="#232733" stroke="#6c8aff"/>
+      <text x="110" y="532" text-anchor="middle" fill="#6c8aff" font-size="10">13. "已完成，以下是汇总..."</text>
+    </svg>
+  </div>
+  <p style="color:var(--text-muted);font-size:0.9em;">注：为简化图示，省略了 Ray（测试）环节。实际流程中 Leo 完成后会触发 Ray 测试，测试通过后再汇总。</p>
+</div>
+
+<!-- 7. 安全模型 -->
+<div class="section" id="s7">
+  <h2><span class="sn">07</span>安全模型</h2>
+
+  <p>安全设计围绕三道防线：</p>
+
+  <div class="two-col">
+    <div class="col-card">
+      <h4 style="color:var(--green)">第一道：工具白名单</h4>
+      <p>每个 Agent 只能调用配置中声明的工具。LLM 想调用未注册的工具会被 Runtime 直接拒绝。</p>
+      <ul>
+        <li>Ada 没有 write_file → 不可能修改代码</li>
+        <li>Sam 没有 read_file → 不可能看源码</li>
+        <li>Max 没有任何文件/shell 工具</li>
+      </ul>
+    </div>
+    <div class="col-card">
+      <h4 style="color:var(--orange)">第二道：工具内部约束</h4>
+      <p>工具本身还有细粒度控制：</p>
+      <ul>
+        <li><strong>Shell 命令白名单</strong>：只允许 go build、go test、git diff 等</li>
+        <li><strong>文件路径沙箱</strong>：不能访问项目目录之外</li>
+        <li><strong>写入黑名单</strong>：.env、credentials 等敏感文件禁止写入</li>
+        <li><strong>Ray 写入白名单</strong>：只能写 *_test.go</li>
+      </ul>
+    </div>
+  </div>
+  <div class="col-card" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px;">
+    <h4 style="color:var(--red)">第三道：审批门控</h4>
+    <p>即使 Agent 有权限，以下操作仍需用户确认：</p>
+    <ul>
+      <li>执行前的整体方案</li>
+      <li>git push / 部署操作</li>
+      <li>任务失败后的处理决策</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 8. 可扩展性 -->
+<div class="section" id="s8">
+  <h2><span class="sn">08</span>可扩展性设计</h2>
+
+  <h3>加一个新 Agent 需要什么？</h3>
+  <p>只需要在 <code>agents.yaml</code> 中添加一段配置：</p>
+  <pre>
+  - name: doc           # 名字
+    role: doc_writer    # 角色
+    model: claude-sonnet-4-6
+    system_prompt: |    # 人设
+      你是 Doc，一个技术文档工程师...
+    tools:              # 工具白名单
+      - read_file
+      - write_file
+    constraints:        # 约束
+      write_patterns: ["*.md"]
+      timeout: 120s</pre>
+  <p><strong>不需要改任何 Go 代码</strong>。框架自动根据配置创建 Agent 实例、注册工具、接入消息总线。</p>
+
+  <h3>加一个新工具需要什么？</h3>
+  <ol>
+    <li>实现 <code>Tool</code> 接口（Name / Description / Parameters / Execute）</li>
+    <li>在 Registry 中注册</li>
+    <li>在需要的 Agent 配置中添加工具名</li>
+  </ol>
+
+  <h3>接入新的外部服务（MCP）</h3>
+  <p>只需在 Agent 配置的 <code>mcp_servers</code> 中添加 MCP Server 定义。框架自动启动进程、完成握手、发现工具。</p>
+</div>
+
+<!-- 9. 风险与 Trade-off -->
+<div class="section" id="s9">
+  <h2><span class="sn">09</span>风险与 Trade-off</h2>
+
+  <table>
+    <thead><tr><th>风险</th><th>影响</th><th>缓解措施</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Max 是单点瓶颈</strong><br>所有通信经过 Max</td>
+        <td>Max 响应慢时整个团队停摆</td>
+        <td>Max 用 Sonnet（快+稳）；只做调度不做重活；未来可加副手</td>
+      </tr>
+      <tr>
+        <td><strong>LLM 幻觉导致错误操作</strong><br>比如 Leo 写了错误代码</td>
+        <td>代码质量问题</td>
+        <td>Ray 自动跑测试兜底；危险操作有审批门控；shell 命令白名单</td>
+      </tr>
+      <tr>
+        <td><strong>上下文窗口溢出</strong><br>复杂任务需要大量上下文</td>
+        <td>Agent 丢失关键信息</td>
+        <td>Max 负责裁剪上下文——只传递 Artifact，不传递完整对话历史</td>
+      </tr>
+      <tr>
+        <td><strong>任务拆解质量</strong><br>Max 拆解不准确</td>
+        <td>后续执行方向偏差</td>
+        <td>方案确认环节由用户把关；Max 用结构化 prompt 引导输出</td>
+      </tr>
+      <tr>
+        <td><strong>成本控制</strong><br>多 Agent 意味着多次 LLM 调用</td>
+        <td>API 费用高于单 Agent</td>
+        <td>审计日志记录 token 用量；Haiku 用于轻量任务；未来加缓存</td>
+      </tr>
+      <tr>
+        <td><strong>MCP Server 不稳定</strong><br>外部进程崩溃</td>
+        <td>Agent 失去部分工具</td>
+        <td>自动重连 + 降级（移除不可用工具，继续执行）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 10. 分阶段落地 -->
+<div class="section" id="s10">
+  <h2><span class="sn">10</span>分阶段落地计划</h2>
+
+  <div class="two-col">
+    <div class="col-card" style="border-color:var(--green);">
+      <h4 style="color:var(--green)">Phase 1 — MVP（2 周）</h4>
+      <p>跑通核心链路：用户 → Max → Leo → 用户</p>
+      <ul>
+        <li>Runtime + MessageBus + Scheduler</li>
+        <li>Max（调度）+ Leo（写代码）</li>
+        <li>基础工具：read/write_file + run_shell + git</li>
+        <li>CLI 交互</li>
+        <li>Approval Gate（方案确认）</li>
+      </ul>
+      <p style="margin-top:8px;color:var(--green);font-size:0.85em;"><strong>交付标准</strong>：能对 Max 说"给 XX 加个功能"，Leo 自动写代码。</p>
+    </div>
+    <div class="col-card" style="border-color:var(--accent);">
+      <h4 style="color:var(--accent)">Phase 2 — 完善（3 周）</h4>
+      <p>补齐团队成员和外部集成</p>
+      <ul>
+        <li>Ada（架构师）+ Ray（测试）+ Sam（运维）</li>
+        <li>MCP 集成（gitnexus / cooper / grafana）</li>
+        <li>审计日志</li>
+        <li>DAG 可视化（终端输出）</li>
+        <li>任务重试与错误恢复</li>
+      </ul>
+    </div>
+    <div class="col-card" style="border-color:var(--accent2);">
+      <h4 style="color:var(--accent2)">Phase 3 — 增强（持续）</h4>
+      <ul>
+        <li>Web UI</li>
+        <li>多项目支持</li>
+        <li>Agent 记忆（跨会话持久化）</li>
+        <li>自定义 Agent（纯 YAML 配置）</li>
+        <li>成本监控仪表盘</li>
+        <li>对话历史回放</li>
+      </ul>
+    </div>
+    <div class="col-card" style="border-style:dashed;border-color:var(--text-muted);">
+      <h4 style="color:var(--text-muted)">未来可能</h4>
+      <ul style="color:var(--text-muted);">
+        <li>多模型支持（Gemini、GPT 混用）</li>
+        <li>Agent 自学习（从历史任务中提取经验）</li>
+        <li>团队模板（预设不同场景的团队组合）</li>
+        <li>协作看板（类 Trello 的可视化管理）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <p>Max Team — 技术方案 v0.1 — 2026-05-21</p>
+  <p style="margin-top:8px;">
+    <a href="overview-design.html">概要设计</a> ·
+    <a href="detailed-design.html">详细设计（代码蓝图）</a>
+  </p>
+</div>
+
+</div>
+</body>
+</html>

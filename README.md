@@ -15,4 +15,5 @@
 ## 文档
 
 - [概要设计](https://horizon6666.github.io/max-team/overview-design.html)
+- [技术设计](https://horizon6666.github.io/max-team/technical-design.html)
 - [详细设计](https://horizon6666.github.io/max-team/detailed-design.html)
