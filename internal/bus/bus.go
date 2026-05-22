@@ -70,13 +70,11 @@ func (b *MessageBus) Send(msg Message) {
 	ch, ok := b.subs[msg.To]
 	b.mu.RUnlock()
 
-	if !ok {
-		return
-	}
-
-	select {
-	case ch <- msg:
-	default:
+	if ok {
+		select {
+		case ch <- msg:
+		default:
+		}
 	}
 
 	b.mu.RLock()

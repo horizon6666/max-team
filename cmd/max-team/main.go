@@ -22,6 +22,7 @@ func main() {
 	baseURL := flag.String("base-url", "", "覆盖 LLM API 地址")
 	apiKey := flag.String("api-key", "", "覆盖 API Key")
 	mode := flag.String("mode", "", "运行模式 (cli/web)")
+	port := flag.Int("port", 0, "覆盖 Web 服务端口")
 	flag.Parse()
 
 	logDir := "logs"
@@ -72,6 +73,9 @@ func main() {
 	}
 	if *mode != "" {
 		cfg.Server.Mode = *mode
+	}
+	if *port != 0 {
+		cfg.Server.Port = *port
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
