@@ -24,6 +24,16 @@ func (r *Registry) Get(name string) (Tool, bool) {
 	return t, ok
 }
 
+func (r *Registry) All() []Tool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]Tool, 0, len(r.tools))
+	for _, t := range r.tools {
+		result = append(result, t)
+	}
+	return result
+}
+
 func (r *Registry) ForAgent(allowedNames []string) []Tool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

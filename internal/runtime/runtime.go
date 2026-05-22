@@ -19,6 +19,7 @@ import (
 	"github.com/horizon6666/max-team/internal/scheduler"
 	"github.com/horizon6666/max-team/internal/task"
 	"github.com/horizon6666/max-team/internal/tool"
+	"github.com/horizon6666/max-team/internal/web"
 )
 
 const (
@@ -53,6 +54,7 @@ type Runtime struct {
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
 	rl        *readline.Instance
+	webServer *web.Server
 
 	state       cliState
 	pendingMsg  bus.Message
@@ -129,6 +131,37 @@ func (rt *Runtime) createAgent(ac config.AgentConfig) agent.Agent {
 }
 
 func (rt *Runtime) Run() {
+	if rt.cfg.Server.Mode == "web" {
+		rt.runWeb()
+		return
+	}
+	rt.runCLI()
+}
+
+func (rt *Runtime) runWeb() {
+	deps := web.Deps{
+		Bus:       rt.bus,
+		TaskMgr:   rt.taskMgr,
+		Agents:    rt.agents,
+		Audit:     rt.audit,
+		Router:    rt.router,
+		Registry:  rt.registry,
+		Cfg:       rt.cfg,
+		AgentsCfg: rt.agentsCfg,
+	}
+	rt.webServer = web.NewServer(deps)
+	port := rt.cfg.Server.Port
+	if port == 0 {
+		port = 8080
+	}
+	if err := rt.webServer.Start(port); err != nil {
+		log.Fatalf("[runtime] web server start failed: %v", err)
+	}
+	fmt.Printf("\n  Max Team Web UI 已启动: http://localhost:%d\n\n", port)
+	select {}
+}
+
+func (rt *Runtime) runCLI() {
 	inbox := rt.bus.Subscribe("user")
 	inputCh := make(chan string)
 	stdinClosed := false
@@ -281,6 +314,9 @@ func (rt *Runtime) printWelcome() {
 
 func (rt *Runtime) Stop() {
 	log.Printf("[runtime] shutting down...")
+	if rt.webServer != nil {
+		rt.webServer.Stop(context.Background())
+	}
 	if rt.cancel != nil {
 		rt.cancel()
 	}

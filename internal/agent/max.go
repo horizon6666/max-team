@@ -64,6 +64,9 @@ func (m *MaxAgent) handleUserInput(ctx context.Context, msg bus.Message) {
 	}
 	log.Printf("[max] received user input: %s", truncateLog(userInput, 100))
 
+	m.setStatus("thinking", "分析用户需求")
+	defer m.setStatus("idle", "")
+
 	m.ResetHistory()
 	m.taskMgr.Reset()
 
@@ -113,6 +116,8 @@ func (m *MaxAgent) handleUserInput(ctx context.Context, msg bus.Message) {
 
 func (m *MaxAgent) handleAllDone(ctx context.Context, msg bus.Message) {
 	log.Printf("[max] all tasks done, generating summary")
+	m.setStatus("thinking", "生成完成报告")
+	defer m.setStatus("idle", "")
 
 	summary := m.taskMgr.Summary()
 	prompt := fmt.Sprintf(`所有任务已完成。以下是任务执行结果：

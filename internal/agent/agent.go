@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/horizon6666/max-team/internal/audit"
 	"github.com/horizon6666/max-team/internal/bus"
@@ -13,21 +14,34 @@ import (
 	"github.com/horizon6666/max-team/internal/tool"
 )
 
+type AgentStatus struct {
+	Name        string `json:"name"`
+	Role        string `json:"role"`
+	Status      string `json:"status"`
+	CurrentTask string `json:"current_task"`
+	Provider    string `json:"provider"`
+	Model       string `json:"model"`
+}
+
 type Agent interface {
 	Name() string
 	Start(ctx context.Context) error
 	Run(ctx context.Context)
 	Stop()
+	Status() AgentStatus
 }
 
 type BaseAgent struct {
-	config  config.AgentConfig
-	router  *llm.Router
-	tools   []tool.Tool
-	bus     *bus.MessageBus
-	inbox   <-chan bus.Message
-	audit   *audit.Logger
-	history []llm.Message
+	config      config.AgentConfig
+	router      *llm.Router
+	tools       []tool.Tool
+	bus         *bus.MessageBus
+	inbox       <-chan bus.Message
+	audit       *audit.Logger
+	history     []llm.Message
+	mu          sync.RWMutex
+	status      string
+	currentTask string
 }
 
 func NewBaseAgent(cfg config.AgentConfig, r *llm.Router, tools []tool.Tool, b *bus.MessageBus, a *audit.Logger) BaseAgent {
@@ -39,6 +53,7 @@ func NewBaseAgent(cfg config.AgentConfig, r *llm.Router, tools []tool.Tool, b *b
 		bus:    b,
 		inbox:  inbox,
 		audit:  a,
+		status: "idle",
 	}
 }
 
@@ -53,11 +68,40 @@ func (b *BaseAgent) Stop() {
 	log.Printf("[%s] agent stopped", b.config.Name)
 }
 
+func (b *BaseAgent) Status() AgentStatus {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return AgentStatus{
+		Name:        b.config.Name,
+		Role:        b.config.Role,
+		Status:      b.status,
+		CurrentTask: b.currentTask,
+		Provider:    b.config.Provider,
+		Model:       b.config.Model,
+	}
+}
+
+func (b *BaseAgent) setStatus(status, currentTask string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.status = status
+	b.currentTask = currentTask
+}
+
 func (b *BaseAgent) ResetHistory() {
 	b.history = nil
 }
 
 func (b *BaseAgent) RunLLM(ctx context.Context, userMessage string) (string, error) {
+	b.mu.Lock()
+	b.status = "thinking"
+	b.mu.Unlock()
+	defer func() {
+		b.mu.Lock()
+		b.status = "idle"
+		b.mu.Unlock()
+	}()
+
 	b.history = append(b.history, llm.Message{
 		Role:    llm.RoleUser,
 		Content: userMessage,

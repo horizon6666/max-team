@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/horizon6666/max-team/internal/config"
 	"github.com/horizon6666/max-team/internal/tool"
 )
@@ -173,13 +172,9 @@ type MCPTool struct {
 	def    MCPToolDef
 }
 
-func (t *MCPTool) Name() string        { return t.def.Name }
-func (t *MCPTool) Description() string { return t.def.Description }
-func (t *MCPTool) InputSchema() anthropic.ToolInputSchemaParam {
-	var schema anthropic.ToolInputSchemaParam
-	json.Unmarshal(t.def.InputSchema, &schema)
-	return schema
-}
+func (t *MCPTool) Name() string            { return t.def.Name }
+func (t *MCPTool) Description() string     { return t.def.Description }
+func (t *MCPTool) InputSchema() json.RawMessage { return t.def.InputSchema }
 
 func (t *MCPTool) Execute(_ context.Context, input json.RawMessage) (string, error) {
 	return t.client.CallTool(t.def.Name, input)

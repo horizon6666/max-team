@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Max Team - Agent 管理平台</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus@2.9.1/dist/index.css">
+<script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus@2.9.1/dist/index.full.min.js"></script>
+<script src="https://unpkg.com/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+.layout { display: flex; height: 100vh; }
+.sidebar { width: 220px; background: #1d1e2c; color: #fff; display: flex; flex-direction: column; }
+.sidebar-header { padding: 20px; text-align: center; border-bottom: 1px solid #2d2e3e; }
+.sidebar-header h2 { font-size: 18px; color: #409eff; }
+.sidebar-header small { color: #888; font-size: 12px; }
+.nav-menu { flex: 1; padding: 10px 0; }
+.nav-item { display: flex; align-items: center; padding: 12px 24px; cursor: pointer; color: #b0b0c0; transition: all 0.2s; font-size: 14px; }
+.nav-item:hover { background: #2d2e3e; color: #fff; }
+.nav-item.active { background: #409eff22; color: #409eff; border-right: 3px solid #409eff; }
+.nav-item .icon { margin-right: 10px; font-size: 16px; width: 20px; text-align: center; }
+.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.topbar { height: 56px; background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.topbar h3 { font-size: 16px; font-weight: 600; }
+.ws-status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #666; }
+.ws-dot { width: 8px; height: 8px; border-radius: 50%; }
+.ws-dot.connected { background: #67c23a; }
+.ws-dot.disconnected { background: #f56c6c; }
+.page-content { flex: 1; overflow-y: auto; padding: 20px; }
+.card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #303133; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+.stat-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.stat-card .label { font-size: 13px; color: #909399; margin-bottom: 8px; }
+.stat-card .value { font-size: 28px; font-weight: 700; }
+.stat-card .value.blue { color: #409eff; }
+.stat-card .value.green { color: #67c23a; }
+.stat-card .value.orange { color: #e6a23c; }
+.stat-card .value.purple { color: #9b59b6; }
+.agent-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.agent-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-left: 4px solid #409eff; }
+.agent-card .agent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.agent-card .agent-name { font-size: 16px; font-weight: 600; }
+.agent-card .agent-info { font-size: 13px; color: #666; line-height: 1.8; }
+.task-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.task-column { background: #f5f7fa; border-radius: 8px; padding: 12px; min-height: 200px; }
+.task-column-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; padding: 8px; border-radius: 4px; text-align: center; }
+.task-item { background: #fff; border-radius: 6px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); cursor: pointer; }
+.task-item:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+.task-item .task-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.task-item .task-meta { font-size: 12px; color: #909399; }
+.chat-container { display: flex; flex-direction: column; height: calc(100vh - 96px); }
+.chat-messages { flex: 1; overflow-y: auto; padding: 16px; }
+.chat-msg { margin-bottom: 16px; display: flex; }
+.chat-msg.user { justify-content: flex-end; }
+.chat-msg .bubble { max-width: 70%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.chat-msg.user .bubble { background: #409eff; color: #fff; border-bottom-right-radius: 4px; }
+.chat-msg.agent .bubble { background: #fff; color: #303133; border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.chat-msg.system .bubble { background: #fdf6ec; color: #e6a23c; max-width: 90%; text-align: center; margin: 0 auto; }
+.chat-input-area { padding: 16px; background: #fff; border-top: 1px solid #ebeef5; display: flex; gap: 12px; }
+.chat-input-area input { flex: 1; }
+.approval-bar { background: #fdf6ec; padding: 12px 16px; border-radius: 8px; margin: 8px 16px; display: flex; align-items: center; justify-content: space-between; }
+.log-filters { display: flex; gap: 12px; margin-bottom: 16px; }
+#token-chart { width: 100%; height: 300px; }
+.tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.tool-item { background: #f5f7fa; border-radius: 6px; padding: 14px; }
+.tool-item .tool-name { font-weight: 600; font-size: 14px; color: #303133; }
+.tool-item .tool-desc { font-size: 13px; color: #606266; margin-top: 4px; }
+.config-section { margin-bottom: 24px; }
+.config-section h4 { margin-bottom: 12px; color: #303133; }
+.event-feed { max-height: 300px; overflow-y: auto; }
+.event-item { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; display: flex; gap: 12px; }
+.event-item .event-time { color: #909399; white-space: nowrap; }
+.event-item .event-type { font-weight: 600; min-width: 100px; }
+</style>
+</head>
+<body>
+<div id="app">
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Max Team</h2>
+      <small>Agent 管理平台</small>
+    </div>
+    <div class="nav-menu">
+      <div v-for="nav in navItems" :key="nav.key" class="nav-item" :class="{active: currentPage === nav.key}" @click="currentPage = nav.key">
+        <span class="icon">{{nav.icon}}</span> {{nav.label}}
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="topbar">
+      <h3>{{currentNav.label}}</h3>
+      <div class="ws-status">
+        <span class="ws-dot" :class="wsConnected ? 'connected' : 'disconnected'"></span>
+        {{wsConnected ? '实时连接' : '已断开'}}
+      </div>
+    </div>
+
+    <div class="page-content">
+      <!-- Dashboard -->
+      <template v-if="currentPage === 'dashboard'">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="label">Agent 数量</div><div class="value blue">{{agents.length}}</div></div>
+          <div class="stat-card"><div class="label">活跃任务</div><div class="value green">{{activeTasks.length}}</div></div>
+          <div class="stat-card"><div class="label">总 Token 用量</div><div class="value orange">{{formatNumber(stats.total_input_tokens + stats.total_output_tokens)}}</div></div>
+          <div class="stat-card"><div class="label">工具调用</div><div class="value purple">{{stats.total_tool_execs || 0}}</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="card">
+            <div class="card-title">Agent 状态</div>
+            <div class="agent-cards">
+              <div v-for="a in agents" :key="a.name" class="agent-card">
+                <div class="agent-header">
+                  <span class="agent-name">{{a.name}}</span>
+                  <el-tag :type="a.status === 'idle' ? 'info' : 'success'" size="small">{{a.status}}</el-tag>
+                </div>
+                <div class="agent-info">
+                  <div>角色: {{a.role}}</div>
+                  <div>模型: {{a.model}}</div>
+                  <div v-if="a.current_task">当前: {{a.current_task}}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">实时事件</div>
+            <div class="event-feed">
+              <div v-for="evt in recentEvents.slice(-20).reverse()" :key="evt.time" class="event-item">
+                <span class="event-time">{{formatTime(evt.time)}}</span>
+                <span class="event-type" :style="{color: eventColor(evt.type)}">{{evt.type}}</span>
+                <span>{{formatEventData(evt)}}</span>
+              </div>
+              <div v-if="recentEvents.length === 0" style="text-align:center;color:#ccc;padding:40px;">等待事件...</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title">Token 用量趋势</div>
+          <div id="token-chart"></div>
+        </div>
+      </template>
+
+      <!-- Agents -->
+      <template v-if="currentPage === 'agents'">
+        <div class="agent-cards">
+          <div v-for="a in agents" :key="a.name" class="agent-card">
+            <div class="agent-header">
+              <span class="agent-name">{{a.name}}</span>
+              <el-tag :type="statusTagType(a.status)" size="small">{{a.status}}</el-tag>
+            </div>
+            <div class="agent-info">
+              <div>角色: {{a.role}}</div>
+              <div>Provider: {{a.provider || 'default'}}</div>
+              <div>模型: {{a.model}}</div>
+              <div v-if="a.current_task" style="margin-top:8px;">
+                <el-tag type="warning" size="small">正在处理</el-tag> {{a.current_task}}
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Tasks -->
+      <template v-if="currentPage === 'tasks'">
+        <div class="task-board">
+          <div v-for="col in taskColumns" :key="col.status" class="task-column">
+            <div class="task-column-title" :style="{background: col.color + '22', color: col.color}">
+              {{col.label}} ({{tasksByStatus(col.status).length}})
+            </div>
+            <div v-for="t in tasksByStatus(col.status)" :key="t.id" class="task-item" @click="selectedTask = t">
+              <div class="task-title">{{t.title}}</div>
+              <div class="task-meta">
+                <span>{{t.agent_name}}</span>
+                <span v-if="t.depends_on && t.depends_on.length"> | 依赖: {{t.depends_on.join(', ')}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <el-dialog v-model="showTaskDetail" :title="selectedTask?.title || ''" width="600px">
+          <template v-if="selectedTask">
+            <p><strong>ID:</strong> {{selectedTask.id}}</p>
+            <p><strong>Agent:</strong> {{selectedTask.agent_name}}</p>
+            <p><strong>状态:</strong> {{selectedTask.status}}</p>
+            <p><strong>描述:</strong></p>
+            <pre style="background:#f5f7fa;padding:12px;border-radius:4px;white-space:pre-wrap;">{{selectedTask.description}}</pre>
+            <template v-if="selectedTask.result">
+              <p style="margin-top:12px;"><strong>结果:</strong></p>
+              <pre style="background:#f5f7fa;padding:12px;border-radius:4px;white-space:pre-wrap;max-height:300px;overflow:auto;">{{selectedTask.result.output}}</pre>
+            </template>
+          </template>
+        </el-dialog>
+      </template>
+
+      <!-- Chat -->
+      <template v-if="currentPage === 'chat'">
+        <div class="chat-container">
+          <div v-if="pendingApproval" class="approval-bar">
+            <span>任务计划等待审批</span>
+            <div>
+              <el-button type="success" size="small" @click="approveTask(true)">批准</el-button>
+              <el-button type="danger" size="small" @click="approveTask(false)">拒绝</el-button>
+            </div>
+          </div>
+          <div class="chat-messages" ref="chatMessages">
+            <div v-for="(msg, i) in chatHistory" :key="i" class="chat-msg" :class="msg.role">
+              <div class="bubble">{{msg.content}}</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <el-input v-model="chatInput" placeholder="输入消息..." @keyup.enter="sendChat" :disabled="chatWaiting"></el-input>
+            <el-button type="primary" @click="sendChat" :loading="chatWaiting">发送</el-button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Logs -->
+      <template v-if="currentPage === 'logs'">
+        <div class="card">
+          <div class="log-filters">
+            <el-select v-model="logAgentFilter" placeholder="Agent" clearable size="default" style="width:150px;" @change="fetchAudit">
+              <el-option v-for="a in agents" :key="a.name" :label="a.name" :value="a.name"></el-option>
+            </el-select>
+            <el-select v-model="logTypeFilter" placeholder="事件类型" clearable size="default" style="width:150px;" @change="fetchAudit">
+              <el-option label="LLM 调用" value="llm_call"></el-option>
+              <el-option label="工具执行" value="tool_exec"></el-option>
+              <el-option label="消息发送" value="msg_sent"></el-option>
+              <el-option label="任务更新" value="task_update"></el-option>
+              <el-option label="审批" value="approval"></el-option>
+              <el-option label="错误" value="error"></el-option>
+            </el-select>
+            <el-button @click="fetchAudit" size="default">刷新</el-button>
+          </div>
+          <el-table :data="auditLogs" stripe style="width:100%" max-height="600">
+            <el-table-column prop="ts" label="时间" width="180" :formatter="(r)=>new Date(r.ts).toLocaleString()"></el-table-column>
+            <el-table-column prop="type" label="类型" width="120">
+              <template #default="{row}">
+                <el-tag :type="logTagType(row.type)" size="small">{{row.type}}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="agent" label="Agent" width="100"></el-table-column>
+            <el-table-column label="详情">
+              <template #default="{row}">
+                <span style="font-size:13px;">{{formatLogData(row)}}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </template>
+
+      <!-- Tools -->
+      <template v-if="currentPage === 'tools'">
+        <div class="card">
+          <div class="card-title">内置工具 ({{toolsList.length}})</div>
+          <div class="tools-grid">
+            <div v-for="t in toolsList" :key="t.name" class="tool-item">
+              <div class="tool-name">{{t.name}}</div>
+              <div class="tool-desc">{{t.description}}</div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Config -->
+      <template v-if="currentPage === 'config'">
+        <div class="card">
+          <div class="card-title">系统配置</div>
+          <div class="config-section">
+            <h4>LLM 配置</h4>
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="默认 Provider">{{configData?.llm?.default_provider}}</el-descriptions-item>
+              <el-descriptions-item label="默认模型">{{configData?.llm?.default_model}}</el-descriptions-item>
+              <el-descriptions-item label="服务端口">{{configData?.server?.port}}</el-descriptions-item>
+              <el-descriptions-item label="运行模式">{{configData?.server?.mode}}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+          <div class="config-section" v-if="configData?.agents">
+            <h4>Agent 配置</h4>
+            <el-table :data="configData.agents" stripe>
+              <el-table-column prop="name" label="名称" width="100"></el-table-column>
+              <el-table-column prop="role" label="角色" width="120"></el-table-column>
+              <el-table-column prop="model" label="模型" width="180"></el-table-column>
+              <el-table-column prop="provider" label="Provider" width="120"></el-table-column>
+              <el-table-column label="工具">
+                <template #default="{row}">{{(row.tools||[]).join(', ')}}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+      </template>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
+
+const app = createApp({
+  setup() {
+    const currentPage = ref('dashboard');
+    const wsConnected = ref(false);
+    const agents = ref([]);
+    const tasks = ref([]);
+    const stats = ref({});
+    const auditLogs = ref([]);
+    const toolsList = ref([]);
+    const configData = ref(null);
+    const recentEvents = ref([]);
+    const chatHistory = ref([]);
+    const chatInput = ref('');
+    const chatWaiting = ref(false);
+    const pendingApproval = ref(null);
+    const selectedTask = ref(null);
+    const showTaskDetail = computed({ get: () => !!selectedTask.value, set: (v) => { if (!v) selectedTask.value = null; }});
+    const logAgentFilter = ref('');
+    const logTypeFilter = ref('');
+    const chatMessages = ref(null);
+    let ws = null;
+    let refreshTimer = null;
+
+    const navItems = [
+      { key: 'dashboard', label: 'Dashboard', icon: '📊' },
+      { key: 'agents', label: 'Agents', icon: '🤖' },
+      { key: 'tasks', label: '任务看板', icon: '📋' },
+      { key: 'chat', label: '对话', icon: '💬' },
+      { key: 'logs', label: '审计日志', icon: '📝' },
+      { key: 'tools', label: '工具', icon: '🔧' },
+      { key: 'config', label: '配置', icon: '⚙️' },
+    ];
+
+    const currentNav = computed(() => navItems.find(n => n.key === currentPage.value) || navItems[0]);
+
+    const taskColumns = [
+      { status: 'created', label: '待计划', color: '#909399' },
+      { status: 'planned', label: '已计划', color: '#409eff' },
+      { status: 'approved', label: '已批准', color: '#67c23a' },
+      { status: 'running', label: '执行中', color: '#e6a23c' },
+      { status: 'done', label: '已完成', color: '#67c23a' },
+      { status: 'failed', label: '失败', color: '#f56c6c' },
+    ];
+
+    const statusMap = { 0: 'created', 1: 'planned', 2: 'approved', 3: 'dispatched', 4: 'running', 5: 'done', 6: 'failed' };
+    const activeTasks = computed(() => tasks.value.filter(t => {
+      const s = typeof t.status === 'number' ? statusMap[t.status] : t.status;
+      return s === 'running' || s === 'dispatched';
+    }));
+
+    function tasksByStatus(status) {
+      return tasks.value.filter(t => {
+        const s = typeof t.status === 'number' ? statusMap[t.status] : t.status;
+        if (status === 'running') return s === 'running' || s === 'dispatched';
+        return s === status;
+      });
+    }
+
+    function statusTagType(s) {
+      if (s === 'idle') return 'info';
+      if (s === 'thinking') return 'success';
+      if (s === 'tool_calling') return 'warning';
+      return '';
+    }
+
+    function logTagType(t) {
+      const m = { llm_call: '', tool_exec: 'success', error: 'danger', approval: 'warning', msg_sent: 'info', task_update: '' };
+      return m[t] || '';
+    }
+
+    function formatNumber(n) {
+      if (!n) return '0';
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return n.toString();
+    }
+
+    function formatTime(ts) {
+      return new Date(ts).toLocaleTimeString();
+    }
+
+    function eventColor(type) {
+      const m = { user_input: '#409eff', agent_reply: '#67c23a', task_assign: '#e6a23c', task_result: '#67c23a', task_failed: '#f56c6c', progress: '#909399', approval_request: '#e6a23c', need_clarify: '#9b59b6' };
+      return m[type] || '#606266';
+    }
+
+    function formatEventData(evt) {
+      const d = evt.data;
+      if (!d) return '';
+      if (typeof d.payload === 'string') return d.from + ': ' + d.payload.substring(0, 80);
+      return d.from + ' → ' + d.to;
+    }
+
+    function formatLogData(row) {
+      const d = row.data;
+      if (!d) return '';
+      const parts = [];
+      if (d.model) parts.push('model=' + d.model);
+      if (d.tool) parts.push('tool=' + d.tool);
+      if (d.input_tokens) parts.push('in=' + d.input_tokens);
+      if (d.output_tokens) parts.push('out=' + d.output_tokens);
+      if (d.duration) parts.push(d.duration);
+      if (d.error) parts.push('ERROR: ' + d.error);
+      if (d.message) parts.push(d.message);
+      return parts.join(' | ');
+    }
+
+    async function fetchAgents() {
+      try { agents.value = await api('/api/agents'); } catch(e) {}
+    }
+    async function fetchTasks() {
+      try { tasks.value = await api('/api/tasks') || []; } catch(e) {}
+    }
+    async function fetchStats() {
+      try { stats.value = await api('/api/stats') || {}; } catch(e) {}
+    }
+    async function fetchAudit() {
+      try {
+        let url = '/api/audit?';
+        if (logAgentFilter.value) url += 'agent=' + logAgentFilter.value + '&';
+        if (logTypeFilter.value) url += 'type=' + logTypeFilter.value + '&';
+        auditLogs.value = await api(url) || [];
+      } catch(e) {}
+    }
+    async function fetchTools() {
+      try {
+        const data = await api('/api/tools');
+        toolsList.value = data?.tools || [];
+      } catch(e) {}
+    }
+    async function fetchConfig() {
+      try { configData.value = await api('/api/config'); } catch(e) {}
+    }
+
+    async function api(url, opts) {
+      const resp = await fetch(url, opts);
+      return resp.json();
+    }
+
+    function sendChat() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+      chatHistory.value.push({ role: 'user', content: msg });
+      chatInput.value = '';
+      chatWaiting.value = true;
+      fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg })
+      });
+      nextTick(() => scrollChat());
+    }
+
+    function approveTask(approved) {
+      if (!pendingApproval.value) return;
+      fetch('/api/approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: pendingApproval.value, approved })
+      });
+      chatHistory.value.push({ role: 'system', content: approved ? '已批准任务计划' : '已拒绝任务计划' });
+      pendingApproval.value = null;
+    }
+
+    function scrollChat() {
+      if (chatMessages.value) {
+        chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
+      }
+    }
+
+    function connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/ws');
+      ws.onopen = () => { wsConnected.value = true; };
+      ws.onclose = () => {
+        wsConnected.value = false;
+        setTimeout(connectWS, 3000);
+      };
+      ws.onmessage = (e) => {
+        try {
+          const evt = JSON.parse(e.data);
+          recentEvents.value.push(evt);
+          if (recentEvents.value.length > 100) recentEvents.value = recentEvents.value.slice(-100);
+
+          if (evt.type === 'agent_reply' && evt.data?.payload) {
+            chatHistory.value.push({ role: 'agent', content: String(evt.data.payload) });
+            chatWaiting.value = false;
+            nextTick(() => scrollChat());
+          }
+          if (evt.type === 'approval_request') {
+            pendingApproval.value = evt.data?.id;
+            if (evt.data?.payload) {
+              chatHistory.value.push({ role: 'system', content: '任务计划等待审批' });
+            }
+            chatWaiting.value = false;
+          }
+          if (evt.type === 'progress' && evt.data?.payload) {
+            chatHistory.value.push({ role: 'system', content: String(evt.data.payload) });
+            nextTick(() => scrollChat());
+          }
+          if (evt.type === 'need_clarify' && evt.data?.payload) {
+            chatHistory.value.push({ role: 'agent', content: String(evt.data.payload) });
+            chatWaiting.value = false;
+            nextTick(() => scrollChat());
+          }
+
+          fetchAgents();
+          fetchTasks();
+        } catch(err) {}
+      };
+    }
+
+    function renderChart() {
+      const el = document.getElementById('token-chart');
+      if (!el || !stats.value.token_trend) return;
+      const chart = echarts.init(el);
+      const trend = stats.value.token_trend || [];
+      chart.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['Input Tokens', 'Output Tokens'] },
+        xAxis: { type: 'category', data: trend.map(d => d.time) },
+        yAxis: { type: 'value' },
+        series: [
+          { name: 'Input Tokens', type: 'bar', stack: 'total', data: trend.map(d => d.input_tokens), itemStyle: { color: '#409eff' } },
+          { name: 'Output Tokens', type: 'bar', stack: 'total', data: trend.map(d => d.output_tokens), itemStyle: { color: '#67c23a' } }
+        ],
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true }
+      });
+    }
+
+    watch(currentPage, (p) => {
+      if (p === 'logs') fetchAudit();
+      if (p === 'tools') fetchTools();
+      if (p === 'config') fetchConfig();
+      if (p === 'dashboard') { fetchStats(); nextTick(() => setTimeout(renderChart, 100)); }
+    });
+
+    watch(() => stats.value, () => {
+      if (currentPage.value === 'dashboard') nextTick(() => setTimeout(renderChart, 100));
+    });
+
+    onMounted(() => {
+      fetchAgents();
+      fetchTasks();
+      fetchStats();
+      connectWS();
+      refreshTimer = setInterval(() => {
+        fetchAgents();
+        fetchTasks();
+        if (currentPage.value === 'dashboard') fetchStats();
+      }, 5000);
+      nextTick(() => setTimeout(renderChart, 500));
+    });
+
+    onUnmounted(() => {
+      if (ws) ws.close();
+      if (refreshTimer) clearInterval(refreshTimer);
+    });
+
+    return {
+      currentPage, navItems, currentNav, wsConnected,
+      agents, tasks, stats, auditLogs, toolsList, configData,
+      recentEvents, chatHistory, chatInput, chatWaiting,
+      pendingApproval, selectedTask, showTaskDetail,
+      logAgentFilter, logTypeFilter, chatMessages,
+      taskColumns, activeTasks,
+      tasksByStatus, statusTagType, logTagType,
+      formatNumber, formatTime, eventColor, formatEventData, formatLogData,
+      sendChat, approveTask, fetchAudit, fetchTools, fetchConfig,
+    };
+  }
+});
+
+app.use(ElementPlus);
+app.mount('#app');
+</script>
+</body>
+</html>

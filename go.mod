@@ -8,6 +8,7 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/openai/openai-go v1.12.0 // indirect

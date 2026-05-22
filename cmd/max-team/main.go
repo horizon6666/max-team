@@ -21,6 +21,7 @@ func main() {
 	provider := flag.String("provider", "", "覆盖 Provider (anthropic/openai)")
 	baseURL := flag.String("base-url", "", "覆盖 LLM API 地址")
 	apiKey := flag.String("api-key", "", "覆盖 API Key")
+	mode := flag.String("mode", "", "运行模式 (cli/web)")
 	flag.Parse()
 
 	logDir := "logs"
@@ -68,6 +69,9 @@ func main() {
 			cfg.LLM.Providers[cfg.LLM.DefaultProvider] = pcfg
 			break
 		}
+	}
+	if *mode != "" {
+		cfg.Server.Mode = *mode
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

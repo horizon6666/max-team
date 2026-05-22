@@ -48,6 +48,9 @@ func (l *LeoAgent) handleTask(ctx context.Context, msg bus.Message) {
 	}
 	log.Printf("[leo] received task: %s - %s", t.ID, t.Title)
 
+	l.setStatus("thinking", t.Title)
+	defer l.setStatus("idle", "")
+
 	l.ResetHistory()
 
 	prompt := l.buildPrompt(t)

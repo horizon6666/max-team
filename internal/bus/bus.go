@@ -34,10 +34,13 @@ type Message struct {
 	Timestamp time.Time
 }
 
+type Observer func(msg Message)
+
 type MessageBus struct {
-	mu      sync.RWMutex
-	subs    map[string]chan Message
-	pending map[string]chan Message
+	mu        sync.RWMutex
+	subs      map[string]chan Message
+	pending   map[string]chan Message
+	observers []Observer
 }
 
 func New() *MessageBus {
@@ -76,6 +79,14 @@ func (b *MessageBus) Send(msg Message) {
 	default:
 	}
 
+	b.mu.RLock()
+	observers := make([]Observer, len(b.observers))
+	copy(observers, b.observers)
+	b.mu.RUnlock()
+	for _, fn := range observers {
+		fn(msg)
+	}
+
 	if msg.ReplyTo != "" {
 		b.mu.RLock()
 		replyCh, ok := b.pending[msg.ReplyTo]
@@ -87,6 +98,12 @@ func (b *MessageBus) Send(msg Message) {
 			}
 		}
 	}
+}
+
+func (b *MessageBus) AddObserver(fn Observer) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.observers = append(b.observers, fn)
 }
 
 func (b *MessageBus) SendAndWait(msg Message, timeout time.Duration) (Message, error) {
