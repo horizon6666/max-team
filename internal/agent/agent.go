@@ -88,8 +88,16 @@ func (b *BaseAgent) setStatus(status, currentTask string) {
 	b.currentTask = currentTask
 }
 
+const maxHistoryLen = 20
+
 func (b *BaseAgent) ResetHistory() {
 	b.history = nil
+}
+
+func (b *BaseAgent) trimHistory() {
+	if len(b.history) > maxHistoryLen {
+		b.history = b.history[len(b.history)-maxHistoryLen:]
+	}
 }
 
 func (b *BaseAgent) RunLLM(ctx context.Context, userMessage string) (string, error) {
@@ -134,6 +142,7 @@ func (b *BaseAgent) RunLLM(ctx context.Context, userMessage string) (string, err
 		Role:    llm.RoleAssistant,
 		Content: result,
 	})
+	b.trimHistory()
 
 	return result, nil
 }
