@@ -67,7 +67,6 @@ func (m *MaxAgent) handleUserInput(ctx context.Context, msg bus.Message) {
 	m.setStatus("thinking", "分析用户需求")
 	defer m.setStatus("idle", "")
 
-	m.ResetHistory()
 	m.taskMgr.Reset()
 
 	result, err := m.RunLLM(ctx, userInput)
